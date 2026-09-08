@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DIY Robot Build — RoboMind Academy</title>
+  <meta name="description" content="Build a real autonomous ROS2 robot with 2D LiDAR, camera, and IMU for under ₹50,000. Full bill of materials, wiring notes, assembly steps, and ROS2/Nav2 software setup." />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a href="index.html" class="brand"><span class="logo-mark">🤖</span> RoboMind Academy</a>
+      <button class="nav-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></button>
+      <div class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="curriculum.html">Curriculum</a>
+        <a href="labs.html">Interactive Labs</a>
+        <a href="diy-robot.html" class="active">DIY Robot Build</a>
+        <a href="resources.html">Resources</a>
+        <a href="curriculum.html" class="nav-cta">Start Learning</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="page-header">
+    <div class="container">
+      <div class="breadcrumb"><a href="index.html">Home</a> / DIY Robot Build</div>
+      <span class="eyebrow" style="margin-top:14px; display:inline-flex;">🔧 Capstone hardware build</span>
+      <h1>Build a real autonomous robot for under ₹50,000</h1>
+      <p class="lede">A differential-drive rover with a Raspberry Pi brain, 2D LiDAR, camera, and IMU — capable of running full ROS2 Nav2 navigation, SLAM mapping, and on-device object detection. Everything below is priced in INR and sourced from common hobbyist electronics suppliers.</p>
+    </div>
+  </header>
+
+  <section style="padding-top:10px;">
+    <div class="container">
+      <div class="budget-bar">
+        <div>
+          <div class="amount">≈ ₹40,300</div>
+          <div style="font-size:0.8rem; color:var(--text-faint); margin-top:2px;">full build, every optional upgrade included</div>
+        </div>
+        <div class="track"><div class="fill" style="width: 81%;"></div></div>
+        <div style="font-size:0.85rem; color:var(--text-dim); min-width:160px;">81% of the ₹50,000 cap — ≈₹9,700 headroom</div>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="card">
+          <div class="icon">🧠</div>
+          <h3>Compute</h3>
+          <p>Raspberry Pi 4 (4GB) running Ubuntu 22.04 + ROS2 Humble, the same OS/framework combo used throughout the course.</p>
+        </div>
+        <div class="card">
+          <div class="icon">🛰️</div>
+          <h3>Perception</h3>
+          <p>RPLidar A1 for 360° 2D scanning, a Pi Camera for object detection, an IMU for orientation, and ultrasonic sensors as a backup bumper ring.</p>
+        </div>
+        <div class="card">
+          <div class="icon">🛞</div>
+          <h3>Drivetrain</h3>
+          <p>4WD chassis with encoder-equipped DC gear motors, driven by a dual-channel motor driver off a 12V Li-ion pack.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-alt" id="bom">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">📋 Bill of Materials</span>
+        <h2>Every part, and what it's for</h2>
+        <p>Core parts are required for the full course capstone (LiDAR-based Nav2 + SLAM). Optional rows are upgrades you can add later without changing anything else.</p>
+      </div>
+
+      <div class="chip-row">
+        <button class="chip active" data-tier="all">All parts</button>
+        <button class="chip" data-tier="core">Core only (≈ ₹30,600)</button>
+        <button class="chip" data-tier="optional">Optional upgrades</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>Purpose</th>
+              <th>Qty</th>
+              <th class="num">Approx. Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-row-tier="core"><td>Raspberry Pi 4 Model B (4GB)<span class="tier-badge tier-core" style="margin-left:8px;">Core</span></td><td>Main compute — runs Ubuntu + ROS2</td><td>1</td><td class="num">₹6,500</td></tr>
+            <tr data-row-tier="core"><td>32GB microSD card (A2, high-endurance)</td><td>OS + ROS2 workspace storage</td><td>1</td><td class="num">₹700</td></tr>
+            <tr data-row-tier="core"><td>4WD aluminum chassis + wheel set</td><td>Robot frame</td><td>1</td><td class="num">₹2,200</td></tr>
+            <tr data-row-tier="core"><td>DC geared motors w/ quadrature encoders</td><td>Drive + odometry feedback</td><td>4</td><td class="num">₹1,800</td></tr>
+            <tr data-row-tier="core"><td>Dual-channel motor driver (Cytron MDD10A / TB6612FNG)</td><td>Drives motors from Pi GPIO/PWM</td><td>1</td><td class="num">₹900</td></tr>
+            <tr data-row-tier="core"><td>RPLidar A1M8 — 360° 2D LiDAR</td><td>SLAM mapping &amp; Nav2 costmap input</td><td>1</td><td class="num">₹9,999</td></tr>
+            <tr data-row-tier="core"><td>Pi Camera Module v2 (or USB webcam)</td><td>Object detection input</td><td>1</td><td class="num">₹1,200</td></tr>
+            <tr data-row-tier="core"><td>MPU6050 IMU module</td><td>Orientation for sensor fusion</td><td>1</td><td class="num">₹250</td></tr>
+            <tr data-row-tier="core"><td>HC-SR04 ultrasonic sensor</td><td>Backup close-range bumper ring</td><td>3</td><td class="num">₹300</td></tr>
+            <tr data-row-tier="core"><td>12V 3S Li-ion battery pack (~3000mAh) + BMS</td><td>Main power supply</td><td>1</td><td class="num">₹1,800</td></tr>
+            <tr data-row-tier="core"><td>5V/3A buck converter module</td><td>Regulated power for Pi &amp; sensors</td><td>2</td><td class="num">₹500</td></tr>
+            <tr data-row-tier="core"><td>Power switch + emergency stop button</td><td>Safety cutoff</td><td>1</td><td class="num">₹350</td></tr>
+            <tr data-row-tier="core"><td>Wiring, connectors, screws, standoffs</td><td>Assembly hardware</td><td>—</td><td class="num">₹600</td></tr>
+            <tr data-row-tier="core"><td>3D-printed / acrylic sensor mounts</td><td>LiDAR/camera/IMU mounting</td><td>—</td><td class="num">₹700</td></tr>
+            <tr data-row-tier="core"><td>Contingency &amp; spares (~10%)</td><td>Buffer for shipping/DOA parts</td><td>—</td><td class="num">₹2,800</td></tr>
+            <tr data-row-tier="optional"><td>Coral USB Accelerator (Edge TPU)<span class="tier-badge tier-optional" style="margin-left:8px;">Optional</span></td><td>Real-time YOLO-class inference</td><td>1</td><td class="num">₹4,500</td></tr>
+            <tr data-row-tier="optional"><td>High-capacity 5200mAh battery upgrade</td><td>Longer runtime</td><td>1</td><td class="num">₹1,700</td></tr>
+            <tr data-row-tier="optional"><td>Metal-gear precision motor upgrade</td><td>Better torque &amp; odometry accuracy</td><td>1</td><td class="num">₹1,500</td></tr>
+            <tr data-row-tier="optional"><td>Aluminum extrusion frame upgrade</td><td>Sturdier, more expandable chassis</td><td>1</td><td class="num">₹1,200</td></tr>
+            <tr data-row-tier="optional"><td>Spare parts kit (wheels, fuses, wire)</td><td>Field repairs</td><td>1</td><td class="num">₹800</td></tr>
+          </tbody>
+          <tfoot>
+            <tr><td colspan="3">Core total</td><td class="num">₹30,600</td></tr>
+            <tr><td colspan="3">Core + all optional upgrades</td><td class="num">₹40,300</td></tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="callout callout-tip">
+        <span class="glyph">💡</span>
+        <p><strong>On a tighter budget?</strong> Drop the RPLidar and use only the camera + ultrasonic ring for a ~₹20,600 build. You'll lose 360° SLAM mapping, but can still run ROS2, differential-drive control, and camera-based object detection — great for modules 1–6 before upgrading.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">🛠️ Assembly</span>
+        <h2>Build it in eight stages</h2>
+        <p>Each stage maps to a module in the curriculum — do them in order and you'll have a fully verified subsystem before moving to the next.</p>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <h4>Assemble the chassis &amp; mount the motors</h4>
+          <p>Bolt the four gear motors to the chassis, attach wheels, and mount the caster (if your kit uses one). Route motor wires toward where the driver board will sit.</p>
+        </div>
+        <div class="step">
+          <h4>Wire power, the motor driver &amp; the E-stop</h4>
+          <p>Connect the battery through the emergency-stop switch and a fuse before anything else. Wire the buck converters for the Pi's 5V rail separately from the motor driver's 12V rail — never power the Pi directly off the motor supply.</p>
+        </div>
+        <div class="step">
+          <h4>Flash the Pi &amp; install ROS2</h4>
+          <p>Flash Ubuntu 22.04 (64-bit) to the microSD card, boot the Pi headless over SSH, then install ROS2 Humble and create your workspace (see the Software Setup section below).</p>
+        </div>
+        <div class="step">
+          <h4>Mount &amp; wire the sensors</h4>
+          <p>Mount the IMU close to the robot's center of rotation, attach the camera facing forward, and space the three ultrasonic sensors around the front bumper. Connect the IMU over I²C and the ultrasonics to GPIO.</p>
+        </div>
+        <div class="step">
+          <h4>Bring up the motor driver node &amp; verify /cmd_vel</h4>
+          <p>Write or install a ROS2 driver node that subscribes to <code>/cmd_vel</code> and converts it into PWM signals for each wheel. Confirm with <code>ros2 topic pub /cmd_vel geometry_msgs/Twist</code> that the robot drives, turns, and stops correctly.</p>
+        </div>
+        <div class="step">
+          <h4>Calibrate odometry</h4>
+          <p>Drive the robot exactly 1 meter in a straight line and compare against the encoder-reported distance; adjust your wheel-radius and wheel-base parameters until they match. Do the same for a 360° in-place rotation to calibrate angular odometry.</p>
+        </div>
+        <div class="step">
+          <h4>Mount the LiDAR &amp; build your first map</h4>
+          <p>Mount the RPLidar A1 with a clear 360° view, bring up its ROS2 driver, and confirm <code>/scan</code> looks correct in rviz2. Launch <code>slam_toolbox</code> and drive the robot around a room to build your first map.</p>
+        </div>
+        <div class="step">
+          <h4>Launch Nav2 &amp; add object detection</h4>
+          <p>Load your saved map, bring up the full Nav2 stack, and send a "Nav2 Goal" from rviz2 to watch the global and local planners work together. Finally, launch your object-detection node and confirm detections publish correctly alongside navigation.</p>
+        </div>
+      </div>
+
+      <div class="callout callout-warn">
+        <span class="glyph">⚠️</span>
+        <p><strong>Safety first:</strong> Li-ion packs can be dangerous if punctured, short-circuited, or charged incorrectly — always charge with a balance charger matched to your pack's cell count, never leave batteries charging unattended, and keep a fused, easily reachable emergency-stop switch on every powered test. Run early autonomous tests in an open, obstacle-padded area.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-alt" id="software">
+    <div class="container two-col">
+      <div>
+        <span class="eyebrow">💻 Software Setup</span>
+        <h2>From a blank SD card to a working ROS2 workspace</h2>
+        <p>This mirrors what you'll do inside Module 11 — the same commands, just gathered in one place for reference.</p>
+
+        <div class="hero-visual" style="margin-top:22px;">
+          <div class="terminal-dots"><span></span><span></span><span></span></div>
+          <pre><span class="dim"># 1. Install ROS2 Humble on Ubuntu 22.04 (Raspberry Pi)</span>
+<span class="k">$</span> sudo apt update &amp;&amp; sudo apt install ros-humble-desktop
+
+<span class="dim"># 2. Install navigation & SLAM packages</span>
+<span class="k">$</span> sudo apt install ros-humble-navigation2 \
+    ros-humble-nav2-bringup ros-humble-slam-toolbox \
+    ros-humble-robot-localization
+
+<span class="dim"># 3. Create your workspace</span>
+<span class="k">$</span> mkdir -p ~/robot_ws/src &amp;&amp; cd ~/robot_ws
+<span class="k">$</span> colcon build --symlink-install
+<span class="k">$</span> source install/setup.bash
+
+<span class="dim"># 4. Bring up your robot's drivers</span>
+<span class="k">$</span> ros2 launch my_robot_bringup robot.launch.py
+
+<span class="dim"># 5. Build a map, then navigate</span>
+<span class="k">$</span> ros2 launch slam_toolbox online_async_launch.py
+<span class="k">$</span> ros2 launch nav2_bringup navigation_launch.py \
+    map:=~/robot_ws/maps/room.yaml</pre>
+        </div>
+
+        <div class="callout callout-info">
+          <span class="glyph">📦</span>
+          <p>Full package list, driver recommendations, and links to datasheets live on the <a href="resources.html">Resources</a> page.</p>
+        </div>
+      </div>
+
+      <aside class="sticky-card">
+        <h4>What you'll need installed</h4>
+        <ul>
+          <li>Ubuntu 22.04 LTS (64-bit) on the Pi</li>
+          <li>ROS2 Humble Hawksbill</li>
+          <li><code>nav2_bringup</code> + <code>slam_toolbox</code></li>
+          <li><code>robot_localization</code> for IMU/odom fusion</li>
+          <li>OpenCV + your chosen detection model runtime</li>
+          <li>rviz2 &amp; rqt (run from your laptop over the network)</li>
+        </ul>
+      </aside>
+    </div>
+  </section>
+
+  <section>
+    <div class="container cta-band">
+      <span class="eyebrow">Before you buy parts</span>
+      <h2>Walk through the concepts first</h2>
+      <p>Every subsystem here — kinematics, PID, planners, detection — has a free interactive simulator. Get comfortable in the browser before you touch a soldering iron.</p>
+      <div class="hero-actions"><a href="labs.html" class="btn btn-primary">Open Interactive Labs →</a></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="brand" style="margin-bottom:12px;"><span class="logo-mark">🤖</span> RoboMind Academy</div>
+          <p style="font-size:0.88rem; max-width:32ch;">A hands-on ROS2, AI, and autonomous robotics course — from first node to a real robot on your desk.</p>
+        </div>
+        <div>
+          <h5>Learn</h5>
+          <ul>
+            <li><a href="curriculum.html">Curriculum</a></li>
+            <li><a href="labs.html">Interactive Labs</a></li>
+            <li><a href="resources.html">Resources &amp; FAQ</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>Build</h5>
+          <ul>
+            <li><a href="diy-robot.html">DIY Robot Guide</a></li>
+            <li><a href="diy-robot.html#bom">Bill of Materials</a></li>
+            <li><a href="diy-robot.html#software">Software Setup</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>Core Topics</h5>
+          <ul>
+            <li><a href="curriculum.html#module-3">ROS2 Basics</a></li>
+            <li><a href="curriculum.html#module-7">Navigation Stack</a></li>
+            <li><a href="curriculum.html#module-6">Object Detection</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 RoboMind Academy. Built for learners, by learners.</span>
+        <span>Prices are approximate hobbyist-market estimates in INR and will vary by supplier.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

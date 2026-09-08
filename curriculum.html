@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Curriculum — RoboMind Academy</title>
+  <meta name="description" content="Full 12-module curriculum: Linux & Python, ROS2 basics, differential drive kinematics, sensors, object detection, the Nav2 global/local planner stack, SLAM, and a capstone DIY robot build." />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a href="index.html" class="brand"><span class="logo-mark">🤖</span> RoboMind Academy</a>
+      <button class="nav-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></button>
+      <div class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="curriculum.html" class="active">Curriculum</a>
+        <a href="labs.html">Interactive Labs</a>
+        <a href="diy-robot.html">DIY Robot Build</a>
+        <a href="resources.html">Resources</a>
+        <a href="curriculum.html" class="nav-cta">Start Learning</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="page-header">
+    <div class="container">
+      <div class="breadcrumb"><a href="index.html">Home</a> / Curriculum</div>
+      <span class="eyebrow" style="margin-top:14px; display:inline-flex;">📚 12 Modules · ~14 weeks</span>
+      <h1>The full course, module by module</h1>
+      <p class="lede">From Linux and Python fundamentals through ROS2, sensing, object detection, and the complete Nav2 navigation stack — ending in a capstone autonomous robot you build yourself. Click any module to expand it.</p>
+    </div>
+  </header>
+
+  <section style="padding-top:20px;">
+    <div class="container">
+
+      <div class="module" id="module-1">
+        <div class="module-head">
+          <div class="module-num">01</div>
+          <div class="meta">
+            <h3>Foundations — The Robotics &amp; AI Landscape</h3>
+            <div class="duration">Week 1 · Theory + math refresher</div>
+          </div>
+          <div class="module-chevron">+</div>
+        </div>
+        <div class="module-body">
+          <div class="module-body-inner">
+            <p>A grounding in what makes a robot "autonomous": the sense–plan–act loop, and the math you'll lean on for the rest of the course.</p>
+            <ul class="topic-list">
+              <li>What is a robot? Sense–Plan–Act loop</li>
+              <li>Coordinate frames &amp; transforms (2D/3D)</li>
+              <li>Linear algebra refresher: vectors, rotation matrices</li>
+              <li>Probability basics for sensor noise</li>
+              <li>Where AI fits: perception vs. planning vs. control</li>
+              <li>Course roadmap &amp; the capstone robot preview</li>
+            </ul>
+            <div class="module-tags"><span class="tier-badge tier-core">Core</span><span class="pill">Math</span><span class="pill">Concepts</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module" id="module-2">
+        <div class="module-head">
+          <div class="module-num">02</div>
+          <div class="meta">
+            <h3>Linux, Git &amp; Python for Robotics</h3>
+            <div class="duration">Week 2 · Tooling</div>
+          </div>
+          <div class="module-chevron">+</div>
+        </div>
+        <div class="module-body">
+          <div class="module-body-inner">
+            <p>The everyday tooling every ROS2 developer needs before writing a single node.</p>
+            <ul class="topic-list">
+              <li>Ubuntu &amp; shell essentials (bash, permissions, processes)</li>
+              <li>Git &amp; GitHub workflow for robotics projects</li>
+              <li>Python for robotics: classes, threading basics, NumPy</li>
+              <li>Virtual environments &amp; dependency management</li>
+              <li>SSH &amp; remote development on a Raspberry Pi</li>
+              <li>Debugging tools: htop, journalctl, tmux</li>
+            </ul>
+            <div class="module-tags"><span class="tier-badge tier-core">Core</span><span class="pill">Linux</span><span class="pill">Python</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module" id="module-3">
+        <div class="module-head">
+          <div class="module-num">03</div>
+          <div class="meta">
+            <h3>ROS2 Basics</h3>
+            <div class="duration">Weeks 3–4 · Core framework</div>
+          </div>
+          <div class="module-chevron">+</div>
+        </div>
+        <div class="module-body">
+          <div class="module-body-inner">
+            <p>The ROS2 mental model: how independent nodes talk to each other, and the tools to inspect that traffic live.</p>
+            <ul class="topic-list">
+              <li>Nodes, topics, publishers &amp; subscribers</li>
+              <li>Services vs. actions — when to use each</li>
+              <li>Packages, workspaces &amp; <code>colcon build</code></li>
+              <li>Launch files &amp; parameters (YAML)</li>
+              <li>tf2: transforms between frames</li>
+              <li>rviz2 &amp; rqt for visualization and debugging</li>
+              <li>Writing your first Python (rclpy) node</li>
+            </ul>
+            <div class="module-tags"><span class="tier-badge tier-core">Core</span><span class="pill">ROS2</span><span class="pill">rclpy</span></div>
+            <div class="callout callout-tip" style="margin-top:20px;">
+              <span class="glyph">🔗</span>
+              <p><strong>Try it live:</strong> jump to the <a href="labs.html#lab-ros">ROS2 Data Flow Visualizer</a> lab to see nodes and topics animate through a real navigation pipeline.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module" id="module-4">
+        <div class="module-head">
+          <div class="module-num">04</div>
+          <div class="meta">
+            <h3>Robot Kinematics &amp; Differential Drive</h3>
+            <div class="duration">Week 5 · Motion fundamentals</div>
+          </div>
+          <div class="module-chevron">+</div>
+        </div>
+        <div class="module-body">
+          <div class="module-body-inner">
+            <p>How two independently driven wheels turn into a robot's linear and angular velocity — and how to keep track of where the robot actually is.</p>
+            <ul class="topic-list">
+              <li>Differential drive kinematics: v, ω from wheel speeds</li>
+              <li>Wheel encoders &amp; odometry integration</li>
+              <li>IMU basics &amp; sensor fusion (complementary/Kalman intro)</li>
+              <li>PID control for wheel velocity</li>
+              <li>Publishing <code>/odom</code> and the odom → base_link transform</li>
+              <li>Common drivetrain mistakes and how to avoid them</li>
+            </ul>
+            <div class="module-tags"><span class="tier-badge tier-core">Core</span><span class="pill">Kinematics</span><span class="pill">PID</span></div>
+            <div class="callout callout-tip" style="margin-top:20px;">
+              <span class="glyph">🕹️</span>
+              <p><strong>Try it live:</strong> steer a virtual robot in the <a href="labs.html#lab-diffdrive">Differential Drive Simulator</a>, then tune a loop in the <a href="labs.html#lab-pid">PID Playground</a>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module" id="module-5">
+        <div class="module-head">
+          <div class="module-num">05</div>
+          <div class="meta">
+            <h3>Sensors &amp; Perception</h3>
+            <div class="duration">Week 6 · Reading the world</div>
+          </div>
+          <div class="module-chevron">+</div>
+        </div>
+        <div class="module-body">
+          <div class="module-body-inner">
+            <p>The sensor suite that turns a blind chassis into a robot that understands its surroundings.</p>
+            <ul class="topic-list">
+              <li>2D LiDAR: <code>sensor_msgs/LaserScan</code></li>
+              <li>Cameras: intrinsics, calibration, image topics</li>
+              <li>Ultrasonic &amp; IR proximity sensors</li>
+              <li>IMU: accelerometer, gyroscope, magnetometer</li>
+              <li>Sensor fusion basics for a mobile base</li>
+              <li>Noise, drift, and how to sanity-check sensor data</li>
+            </ul>
+            <div class="module-tags"><span class="tier-badge tier-core">Core</span><span class="pill">LiDAR</span><span class="pill">Camera</span><span class="pill">IMU</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module" id="module-6">
+        <div class="module-head">
+          <div class="module-num">06</div>
+          <div class="meta">
+            <h3>Computer Vision &amp; Object Detection Models</h3>
+            <div class="duration">Weeks 7–8 · AI perception</div>
+          </div>
+          <div class="module-chevron">+</div>
+        </div>
+        <div class="module-body">
+          <div class="module-body-inner">
+            <p>From classic image processing to real-time neural object detectors running on-device.</p>
+            <ul class="topic-list">
+              <li>OpenCV fundamentals: filtering, contours, color thresholds</li>
+              <li>CNNs in 20 minutes: convolution, pooling, feature maps</li>
+              <li>Object detection models: YOLO family, SSD, MobileNet-SSD</li>
+              <li>Evaluating detectors: IoU, precision/recall, NMS</li>
+              <li>Model optimization: quantization, ONNX, TensorRT</li>
+              <li>Deploying a detector on Raspberry Pi / Jetson inside ROS2</li>
+              <li>Publishing detections as <code>vision_msgs</code></li>
+            </ul>
+            <div class="module-tags"><span class="tier-badge tier-core">Core</span><span class="pill">OpenCV</span><span class="pill">YOLO</span><span class="pill">Edge AI</span></div>
+            <div class="callout callout-tip" style="margin-top:20px;">
+              <span class="glyph">📦</span>
+              <p><strong>Try it live:</strong> drag boxes and watch scoring change in the <a href="labs.html#lab-iou">IoU Playground</a> — the exact metric used to grade detectors like YOLO.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module" id="module-7">
+        <div class="module-head">
+          <div class="module-num">07</div>
+          <div class="meta">
+            <h3>The Navigation Stack — Costmaps &amp; Global Planner</h3>
+            <div class="duration">Week 9 · Nav2 part 1</div>
+          </div>
+          <div class="module-chevron">+</div>
+        </div>
+        <div class="module-body">
+          <div class="module-body-inner">
+            <p>How Nav2 turns a map and a goal pose into a safe path across the environment.</p>
+            <ul class="topic-list">
+              <li>Nav2 architecture overview: servers &amp; lifecycle nodes</li>
+              <li>Costmap2D: static, obstacle, and inflation layers</li>
+              <li>Global planners: Dijkstra, A*, NavFn, Smac Planner</li>
+              <li>Heuristics &amp; grid vs. graph-based planning</li>
+              <li>Global vs. local planning — why you need both</li>
+              <li>Configuring planner plugins via YAML</li>
+            </ul>
+            <div class="module-tags"><span class="tier-badge tier-core">Core</span><span class="pill">Nav2</span><span class="pill">A*</span><span class="pill">Costmaps</span></div>
+            <div class="callout callout-tip" style="margin-top:20px;">
+              <span class="glyph">🧭</span>
+              <p><strong>Try it live:</strong> draw your own maze and race A* to the goal in the <a href="labs.html#lab-astar">Global Planner Visualizer</a>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module" id="module-8">
+        <div class="module-head">
+          <div class="module-num">08</div>
+          <div class="meta">
+            <h3>Local Planner &amp; Controllers</h3>
+            <div class="duration">Week 10 · Nav2 part 2</div>
+          </div>
+          <div class="module-chevron">+</div>
+        </div>
+        <div class="module-body">
+          <div class="module-body-inner">
+            <p>Turning a global path into safe, real-time velocity commands that react to obstacles the map didn't know about.</p>
+            <ul class="topic-list">
+              <li>Local planners: DWA (Dynamic Window Approach), TEB</li>
+              <li>Trajectory scoring: obstacle cost, path alignment, speed</li>
+              <li>Controllers: Regulated Pure Pursuit, velocity smoothing</li>
+              <li>Publishing <code>/cmd_vel</code> and closing the control loop</li>
+              <li>Recovery behaviors: spin, back-up, clear costmap</li>
+              <li>Tuning for a small differential-drive base</li>
+            </ul>
+            <div class="module-tags"><span class="tier-badge tier-core">Core</span><span class="pill">DWA</span><span class="pill">Controllers</span></div>
+            <div class="callout callout-tip" style="margin-top:20px;">
+              <span class="glyph">🛑</span>
+              <p><strong>Try it live:</strong> place obstacles and watch a reactive planner steer around them in the <a href="labs.html#lab-local">Local Planner Lab</a>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module" id="module-9">
+        <div class="module-head">
+          <div class="module-num">09</div>
+          <div class="meta">
+            <h3>SLAM &amp; Localization</h3>
+            <div class="duration">Week 11 · Mapping the world</div>
+          </div>
+          <div class="module-chevron">+</div>
+        </div>
+        <div class="module-body">
+          <div class="module-body-inner">
+            <p>Building a map from scratch, and figuring out where your robot is inside one it already has.</p>
+            <ul class="topic-list">
+              <li>Mapping vs. localization — the two halves of SLAM</li>
+              <li>slam_toolbox for 2D LiDAR mapping</li>
+              <li>AMCL: particle-filter localization on a known map</li>
+              <li>Saving &amp; loading maps (<code>map_server</code>)</li>
+              <li>Loop closure &amp; drift correction, briefly</li>
+              <li>When to remap vs. relocalize</li>
+            </ul>
+            <div class="module-tags"><span class="tier-badge tier-core">Core</span><span class="pill">SLAM</span><span class="pill">AMCL</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module" id="module-10">
+        <div class="module-head">
+          <div class="module-num">10</div>
+          <div class="meta">
+            <h3>Behavior Trees &amp; System Integration</h3>
+            <div class="duration">Week 12 · Tying it together</div>
+          </div>
+          <div class="module-chevron">+</div>
+        </div>
+        <div class="module-body">
+          <div class="module-body-inner">
+            <p>How Nav2 sequences planning, recovery, and detection into one coherent autonomous behavior.</p>
+            <ul class="topic-list">
+              <li>BT Navigator &amp; behavior tree basics</li>
+              <li>Composing custom behavior trees (XML)</li>
+              <li>Multi-node system architecture for a full robot stack</li>
+              <li>Combining navigation with object detection (e.g. "patrol &amp; report")</li>
+              <li>Logging, diagnostics, and <code>ros2 bag</code> for debugging</li>
+            </ul>
+            <div class="module-tags"><span class="tier-badge tier-core">Core</span><span class="pill">Behavior Trees</span><span class="pill">Integration</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module" id="module-11">
+        <div class="module-head">
+          <div class="module-num">11</div>
+          <div class="meta">
+            <h3>DIY Robot Build — From Simulation to Hardware</h3>
+            <div class="duration">Week 13 · Hands-on build</div>
+          </div>
+          <div class="module-chevron">+</div>
+        </div>
+        <div class="module-body">
+          <div class="module-body-inner">
+            <p>Everything from modules 1–10, now applied to real hardware costing under ₹50,000.</p>
+            <ul class="topic-list">
+              <li>Chassis assembly &amp; motor wiring</li>
+              <li>Flashing &amp; configuring the Raspberry Pi</li>
+              <li>Bringing up ROS2 drivers for motors, LiDAR &amp; camera</li>
+              <li>Calibrating odometry on real hardware</li>
+              <li>Running Nav2 + SLAM on the physical robot</li>
+              <li>Safety: e-stops, current limits, battery care</li>
+            </ul>
+            <div class="module-tags"><span class="tier-badge tier-core">Core</span><span class="pill">Hardware</span><span class="pill">Budget build</span></div>
+            <div class="callout callout-info" style="margin-top:20px;">
+              <span class="glyph">🔧</span>
+              <p><strong>Full guide:</strong> see the <a href="diy-robot.html">DIY Robot Build</a> page for the complete bill of materials, wiring, and step-by-step assembly.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module" id="module-12">
+        <div class="module-head">
+          <div class="module-num">12</div>
+          <div class="meta">
+            <h3>Capstone Project — Autonomous Patrol Robot</h3>
+            <div class="duration">Week 14 · Demo day</div>
+          </div>
+          <div class="module-chevron">+</div>
+        </div>
+        <div class="module-body">
+          <div class="module-body-inner">
+            <p>Bring every module together into one demo: a robot that maps a room, localizes itself, navigates to waypoints, and reports what it sees.</p>
+            <ul class="topic-list">
+              <li>Define a mission: patrol route + object-of-interest detection</li>
+              <li>Integrate SLAM, Nav2, and your object detector</li>
+              <li>Handle edge cases: dynamic obstacles, lost localization</li>
+              <li>Record a demo run with <code>ros2 bag</code></li>
+              <li>Present &amp; document your build</li>
+            </ul>
+            <div class="module-tags"><span class="tier-badge tier-core">Core</span><span class="pill">Capstone</span><span class="pill">Demo</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="section-alt">
+    <div class="container cta-band">
+      <span class="eyebrow">Learn by doing</span>
+      <h2>Try the concepts before you build the robot</h2>
+      <p>Six interactive simulators cover the trickiest parts of this curriculum — kinematics, PID, path planning, and object detection.</p>
+      <div class="hero-actions"><a href="labs.html" class="btn btn-primary">Open Interactive Labs →</a></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="brand" style="margin-bottom:12px;"><span class="logo-mark">🤖</span> RoboMind Academy</div>
+          <p style="font-size:0.88rem; max-width:32ch;">A hands-on ROS2, AI, and autonomous robotics course — from first node to a real robot on your desk.</p>
+        </div>
+        <div>
+          <h5>Learn</h5>
+          <ul>
+            <li><a href="curriculum.html">Curriculum</a></li>
+            <li><a href="labs.html">Interactive Labs</a></li>
+            <li><a href="resources.html">Resources &amp; FAQ</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>Build</h5>
+          <ul>
+            <li><a href="diy-robot.html">DIY Robot Guide</a></li>
+            <li><a href="diy-robot.html#bom">Bill of Materials</a></li>
+            <li><a href="diy-robot.html#software">Software Setup</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>Core Topics</h5>
+          <ul>
+            <li><a href="curriculum.html#module-3">ROS2 Basics</a></li>
+            <li><a href="curriculum.html#module-7">Navigation Stack</a></li>
+            <li><a href="curriculum.html#module-6">Object Detection</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 RoboMind Academy. Built for learners, by learners.</span>
+        <span>Made with ROS2, Python, and a lot of debugging.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

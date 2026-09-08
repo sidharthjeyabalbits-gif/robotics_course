@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Labs — RoboMind Academy</title>
+  <meta name="description" content="Six browser-based robotics simulators: differential drive kinematics, PID tuning, A* global planning, reactive local-planner obstacle avoidance, an IoU object-detection playground, and a ROS2 data-flow visualizer." />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a href="index.html" class="brand"><span class="logo-mark">🤖</span> RoboMind Academy</a>
+      <button class="nav-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></button>
+      <div class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="curriculum.html">Curriculum</a>
+        <a href="labs.html" class="active">Interactive Labs</a>
+        <a href="diy-robot.html">DIY Robot Build</a>
+        <a href="resources.html">Resources</a>
+        <a href="curriculum.html" class="nav-cta">Start Learning</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="page-header">
+    <div class="container">
+      <div class="breadcrumb"><a href="index.html">Home</a> / Interactive Labs</div>
+      <span class="eyebrow" style="margin-top:14px; display:inline-flex;">🧪 6 simulators · runs entirely in your browser</span>
+      <h1>Learn robotics concepts by playing with them</h1>
+      <p class="lede">These are simplified, teaching-scale simulations — not the real ROS2/Nav2 stack — built to give you fast, visual intuition for ideas that are usually only explained in equations. Drag things, click things, break things.</p>
+      <nav class="lab-jump">
+        <a href="#lab-diffdrive">① Differential Drive</a>
+        <a href="#lab-pid">② PID Tuning</a>
+        <a href="#lab-astar">③ Global Planner (A*)</a>
+        <a href="#lab-local">④ Local Planner</a>
+        <a href="#lab-iou">⑤ Object Detection IoU</a>
+        <a href="#lab-ros">⑥ ROS2 Data Flow</a>
+        <a href="#quiz">✅ Quick Check</a>
+      </nav>
+    </div>
+  </header>
+
+  <section style="padding-top:10px;">
+    <div class="container">
+
+      <!-- LAB 1 — DIFFERENTIAL DRIVE -->
+      <div class="lab-card" id="lab-diffdrive">
+        <div class="lab-card-head">
+          <div>
+            <span class="lab-index">Lab 01 · Differential Drive Kinematics</span>
+            <h3>Steer a robot and watch the math live</h3>
+            <p>Set independent left/right wheel speeds and watch how the robot's linear velocity (v) and angular velocity (ω) fall out of the difference between them — the same math behind <code>/odom</code>.</p>
+          </div>
+          <span class="badge-live">Live simulation</span>
+        </div>
+        <div class="lab-layout">
+          <div class="lab-canvas-wrap">
+            <canvas id="dd-canvas" width="640" height="380"></canvas>
+            <span class="lab-canvas-status" id="dd-status">Paused</span>
+          </div>
+          <div class="lab-controls">
+            <div class="control-group">
+              <label>Left wheel speed <b id="dd-leftVal">0</b></label>
+              <input type="range" id="dd-left" min="-100" max="100" value="0" />
+            </div>
+            <div class="control-group">
+              <label>Right wheel speed <b id="dd-rightVal">0</b></label>
+              <input type="range" id="dd-right" min="-100" max="100" value="0" />
+            </div>
+            <div class="lab-btn-row">
+              <button class="btn-sm" data-dd-preset="straight">Straight</button>
+              <button class="btn-sm" data-dd-preset="rotate">Rotate in place</button>
+              <button class="btn-sm" data-dd-preset="arc">Arc turn</button>
+              <button class="btn-sm" data-dd-preset="stop">Stop</button>
+            </div>
+            <div class="lab-btn-row">
+              <button class="btn-sm primary" id="dd-start">▶ Start</button>
+              <button class="btn-sm" id="dd-reset">↺ Reset</button>
+            </div>
+            <div class="lab-readout">
+              <div><span>Linear v</span><b id="dd-v">0.00 m/s</b></div>
+              <div><span>Angular ω</span><b id="dd-w">0.00 rad/s</b></div>
+              <div style="grid-column: 1 / -1;"><span>Pose (x, y, θ)</span><b id="dd-pose">(0.00, 0.00, 0°)</b></div>
+            </div>
+            <p class="lab-note">Equal speeds → straight line. Opposite speeds → rotation in place. Different-magnitude same-sign speeds → an arc turn.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- LAB 2 — PID -->
+      <div class="lab-card" id="lab-pid">
+        <div class="lab-card-head">
+          <div>
+            <span class="lab-index">Lab 02 · PID Controller Playground</span>
+            <h3>Tune Kp, Ki, Kd and watch the response curve</h3>
+            <p>The controller is trying to drive a simulated motor to a target velocity (dashed line). Push the gains too far and you'll see overshoot and oscillation — exactly what you'll fight when tuning a real drivetrain.</p>
+          </div>
+          <span class="badge-live">Live simulation</span>
+        </div>
+        <div class="lab-layout">
+          <div class="lab-canvas-wrap">
+            <canvas id="pid-canvas" width="640" height="280"></canvas>
+          </div>
+          <div class="lab-controls">
+            <div class="control-group">
+              <label>Proportional (Kp) <b id="pid-kpVal">2.00</b></label>
+              <input type="range" id="pid-kp" min="0" max="6" step="0.1" value="2" />
+            </div>
+            <div class="control-group">
+              <label>Integral (Ki) <b id="pid-kiVal">0.30</b></label>
+              <input type="range" id="pid-ki" min="0" max="3" step="0.05" value="0.3" />
+            </div>
+            <div class="control-group">
+              <label>Derivative (Kd) <b id="pid-kdVal">0.10</b></label>
+              <input type="range" id="pid-kd" min="0" max="2" step="0.05" value="0.1" />
+            </div>
+            <div class="lab-btn-row">
+              <button class="btn-sm" data-pid-preset="1,0,0">P only</button>
+              <button class="btn-sm" data-pid-preset="4,0,0">Aggressive P</button>
+              <button class="btn-sm" data-pid-preset="2,0.3,0.1">Balanced PID</button>
+            </div>
+            <button class="btn-sm primary btn-block" id="pid-run">▶ Run step response</button>
+            <div class="lab-readout">
+              <div><span>Overshoot</span><b id="pid-overshoot">0.0%</b></div>
+              <div><span>Settling time</span><b id="pid-settle">0.00 s</b></div>
+            </div>
+            <p class="lab-note">Higher Kd damps oscillation but reacts to noise. Higher Ki removes steady-state error but can overshoot.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- LAB 3 — A* GLOBAL PLANNER -->
+      <div class="lab-card" id="lab-astar">
+        <div class="lab-card-head">
+          <div>
+            <span class="lab-index">Lab 03 · Global Planner (A*)</span>
+            <h3>Build a maze, then watch A* solve it</h3>
+            <p>This is what a global planner does on a costmap: search the known grid for the shortest collision-free path from start (S) to goal (G). The violet cells are nodes the search explored; the teal cells are the final path.</p>
+          </div>
+          <span class="badge-live">Live simulation</span>
+        </div>
+        <div class="lab-layout">
+          <div class="lab-canvas-wrap">
+            <canvas id="astar-canvas" width="650" height="350"></canvas>
+          </div>
+          <div class="lab-controls">
+            <div class="lab-btn-row">
+              <button class="btn-sm active" data-astar-mode="wall">🧱 Draw walls</button>
+              <button class="btn-sm" data-astar-mode="start">🟢 Move start</button>
+              <button class="btn-sm" data-astar-mode="goal">🟠 Move goal</button>
+            </div>
+            <div class="control-group">
+              <label>Animation speed</label>
+              <input type="range" id="astar-speed" min="1" max="300" value="220" />
+            </div>
+            <div class="lab-btn-row">
+              <button class="btn-sm primary" id="astar-run">▶ Run A*</button>
+              <button class="btn-sm" id="astar-clear">↺ Clear walls</button>
+            </div>
+            <p class="lab-status-line" id="astar-status">Click cells to add walls, then Run A*.</p>
+            <p class="lab-note">Try walling off the goal completely — the planner will correctly report no path found.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- LAB 4 — LOCAL PLANNER -->
+      <div class="lab-card" id="lab-local">
+        <div class="lab-card-head">
+          <div>
+            <span class="lab-index">Lab 04 · Local Planner &amp; Obstacle Avoidance</span>
+            <h3>React to obstacles the map didn't know about</h3>
+            <p>The global planner gives a route across the map — but the local planner has to dodge things in real time. This robot casts simulated range-sensor rays and steers using a simple attractive/repulsive blend, similar in spirit to DWA.</p>
+          </div>
+          <span class="badge-live">Live simulation</span>
+        </div>
+        <div class="lab-layout">
+          <div class="lab-canvas-wrap">
+            <canvas id="local-canvas" width="640" height="380"></canvas>
+          </div>
+          <div class="lab-controls">
+            <div class="lab-btn-row">
+              <button class="btn-sm active" data-local-mode="obstacle">🚧 Place obstacles</button>
+              <button class="btn-sm" data-local-mode="goal">🎯 Set goal</button>
+            </div>
+            <div class="lab-btn-row">
+              <button class="btn-sm primary" id="local-run">▶ Run</button>
+              <button class="btn-sm" id="local-reset">↺ Reset</button>
+            </div>
+            <p class="lab-status-line" id="local-status">Click the canvas to add/remove obstacles, then Run.</p>
+            <p class="lab-note">Click an existing obstacle to remove it. Up to 8 obstacles at once.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- LAB 5 — IoU / OBJECT DETECTION -->
+      <div class="lab-card" id="lab-iou">
+        <div class="lab-card-head">
+          <div>
+            <span class="lab-index">Lab 05 · Object Detection: IoU Playground</span>
+            <h3>How detectors like YOLO get graded</h3>
+            <p>Drag the orange prediction box (drag the body to move, the bottom-right corner to resize) and watch Intersection-over-Union update against the green ground-truth box. Adjust the threshold to see when a detection counts as a match.</p>
+          </div>
+          <span class="badge-live">Live simulation</span>
+        </div>
+        <div class="lab-layout">
+          <div class="lab-canvas-wrap">
+            <canvas id="iou-canvas" width="520" height="340"></canvas>
+          </div>
+          <div class="lab-controls">
+            <div class="control-group">
+              <label>Match threshold <b id="iou-thresholdVal">0.50</b></label>
+              <input type="range" id="iou-threshold" min="0" max="1" step="0.05" value="0.5" />
+            </div>
+            <div class="lab-readout">
+              <div><span>IoU score</span><b id="iou-value">0.00</b></div>
+              <div><span>Verdict</span><b id="iou-verdict" style="font-size:0.82rem;">—</b></div>
+            </div>
+            <button class="btn-sm btn-block" id="iou-reset">↺ Reset boxes</button>
+            <p class="lab-note">IoU = overlap area ÷ combined area. A typical mAP@0.5 benchmark counts anything ≥ 0.5 as a true positive.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- LAB 6 — ROS2 DATA FLOW -->
+      <div class="lab-card" id="lab-ros">
+        <div class="lab-card-head">
+          <div>
+            <span class="lab-index">Lab 06 · ROS2 Data Flow Visualizer</span>
+            <h3>Step through a real navigation pipeline</h3>
+            <p>Every autonomous move a ROS2 robot makes flows through this same chain of nodes and topics. Click Step (or Auto-play) to walk through one full sense → plan → act cycle.</p>
+          </div>
+          <span class="badge-live">Live simulation</span>
+        </div>
+        <div>
+          <div class="pipeline" id="ros-pipeline">
+            <div class="pipe-node"><span class="glyph">📡</span><span class="name">Sensors</span><span class="topic">/scan · /odom</span></div>
+            <span class="pipe-arrow">➜</span>
+            <div class="pipe-node"><span class="glyph">📍</span><span class="name">Localization</span><span class="topic">/tf (AMCL)</span></div>
+            <span class="pipe-arrow">➜</span>
+            <div class="pipe-node"><span class="glyph">🧭</span><span class="name">Global Planner</span><span class="topic">/plan</span></div>
+            <span class="pipe-arrow">➜</span>
+            <div class="pipe-node"><span class="glyph">🛑</span><span class="name">Local Planner</span><span class="topic">costmap scoring</span></div>
+            <span class="pipe-arrow">➜</span>
+            <div class="pipe-node"><span class="glyph">🎮</span><span class="name">Controller</span><span class="topic">/cmd_vel</span></div>
+            <span class="pipe-arrow">➜</span>
+            <div class="pipe-node"><span class="glyph">⚙️</span><span class="name">Motor Driver</span><span class="topic">wheel PWM</span></div>
+          </div>
+          <div class="lab-btn-row" style="margin-bottom:14px;">
+            <button class="btn-sm primary" id="ros-step">⏭ Step</button>
+            <button class="btn-sm" id="ros-auto">▶ Auto-play</button>
+          </div>
+          <div class="log-panel" id="ros-log"><div class="empty">Click Step to begin the cycle…</div></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="section-alt" id="quiz">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">✅ Quick Check</span>
+        <h2>Test what stuck</h2>
+        <p>Six questions pulled straight from the labs above and the core curriculum.</p>
+      </div>
+      <div id="quiz-container"></div>
+      <div class="quiz-score-bar" id="quiz-score"></div>
+      <div style="text-align:center; margin-top:20px;">
+        <button class="btn-sm" id="quiz-retry">↺ Retry quiz</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container cta-band">
+      <span class="eyebrow">Ready for the real thing?</span>
+      <h2>Take these concepts to a physical robot</h2>
+      <p>Everything simulated above runs for real on the DIY build — under ₹50,000 in parts.</p>
+      <div class="hero-actions"><a href="diy-robot.html" class="btn btn-primary">See the DIY Robot Build →</a></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="brand" style="margin-bottom:12px;"><span class="logo-mark">🤖</span> RoboMind Academy</div>
+          <p style="font-size:0.88rem; max-width:32ch;">A hands-on ROS2, AI, and autonomous robotics course — from first node to a real robot on your desk.</p>
+        </div>
+        <div>
+          <h5>Learn</h5>
+          <ul>
+            <li><a href="curriculum.html">Curriculum</a></li>
+            <li><a href="labs.html">Interactive Labs</a></li>
+            <li><a href="resources.html">Resources &amp; FAQ</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>Build</h5>
+          <ul>
+            <li><a href="diy-robot.html">DIY Robot Guide</a></li>
+            <li><a href="diy-robot.html#bom">Bill of Materials</a></li>
+            <li><a href="diy-robot.html#software">Software Setup</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>Core Topics</h5>
+          <ul>
+            <li><a href="curriculum.html#module-3">ROS2 Basics</a></li>
+            <li><a href="curriculum.html#module-7">Navigation Stack</a></li>
+            <li><a href="curriculum.html#module-6">Object Detection</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 RoboMind Academy. Built for learners, by learners.</span>
+        <span>Made with ROS2, Python, and a lot of debugging.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+  <script src="assets/js/labs.js"></script>
+</body>
+</html>
