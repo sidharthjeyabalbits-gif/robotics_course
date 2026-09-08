@@ -28,27 +28,7 @@
   font-size: 16px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #000000;
-    --bg-alt: #1d1d1f;
-    --surface: #1c1c1e;
-    --surface-2: #2c2c2e;
-    --border: #38383a;
-    --text: #f5f5f7;
-    --text-dim: #c7c7cc;
-    --text-faint: #8e8e93;
-    --accent: #2997ff;
-    --accent-strong: #47a6ff;
-    --accent-soft: rgba(41,151,255,0.14);
-    --accent-2: #c7c7cc;
-    --accent-3: #ff9f0a;
-    --danger: #ff453a;
-    --success: #32d74b;
-    --shadow: 0 20px 45px -20px rgba(0,0,0,0.6);
-    --shadow-sm: 0 8px 20px -12px rgba(0,0,0,0.5);
-  }
-}
+/* Light theme only, always — no automatic dark-mode switch. */
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -568,7 +548,6 @@ footer {
 }
 .tier-core { background: var(--accent-soft); color: var(--accent); }
 .tier-optional { background: rgba(255,159,10,0.14); color: #b06700; }
-@media (prefers-color-scheme: dark) { .tier-optional { color: var(--accent-3); } }
 
 .cta-band {
   border-radius: 22px;
