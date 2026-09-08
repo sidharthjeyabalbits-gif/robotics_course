@@ -1,4 +1,4 @@
-// RoboMind Academy — shared behaviors
+// Dex Robotics — shared behaviors
 
 document.addEventListener("DOMContentLoaded", () => {
   // Mobile nav toggle

@@ -1,30 +1,345 @@
-// RoboMind Academy — Interactive Labs
-// Six vanilla-JS/Canvas simulators used to teach core robotics concepts.
-// Every widget guards on its DOM elements existing, so this file is safe
-// to include on any page.
+// Dex Robotics — Interactive Labs
+// Eight simulators teach core robotics concepts. Where a third dimension
+// adds real understanding (kinematics, planning, mapping) we render with
+// Three.js; where the concept is inherently 2D (a PID step-response chart,
+// image-space bounding boxes) we keep a 2D canvas. Every widget guards on
+// its DOM elements existing, so this file is safe on any page.
+
+const COLORS = {
+  bg: 0xf5f5f7,
+  floor: 0xffffff,
+  wall: 0x1d1d1f,
+  accent: 0x0071e3,
+  explored: 0xcfe7ff,
+  fog: 0xc7c7cc,
+  start: 0x34c759,
+  goal: 0xff9f0a,
+  danger: 0xff3b30,
+  robotBody: 0x0071e3,
+  ray: 0xaeaeb2,
+};
 
 document.addEventListener("DOMContentLoaded", () => {
-  initDiffDriveLab();
-  initPidLab();
-  initAStarLab();
-  initLocalPlannerLab();
-  initIouLab();
-  initRosPipelineLab();
-  initQuiz();
+  [
+    initDiffDriveLab,
+    initPidLab,
+    initAStarLab,
+    initLocalPlannerLab,
+    initMappingLab,
+    initNavigationLab,
+    initIouLab,
+    initRosPipelineLab,
+    initQuiz,
+  ].forEach((init) => {
+    try {
+      init();
+    } catch (err) {
+      console.error(`${init.name} failed to initialize:`, err);
+    }
+  });
 });
 
 /* =========================================================
-   LAB 1 — Differential Drive Kinematics Simulator
+   Shared Three.js helpers
+   ========================================================= */
+function createRenderer(canvas) {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setSize(canvas.width, canvas.height, false);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(COLORS.bg, 1);
+  renderer.shadowMap.enabled = false;
+  return renderer;
+}
+
+function attachOrbitControls(camera, target, domElement, opts = {}) {
+  let radius = opts.radius ?? camera.position.distanceTo(target);
+  let theta = Math.atan2(camera.position.x - target.x, camera.position.z - target.z);
+  let phi = Math.acos(THREE.MathUtils.clamp((camera.position.y - target.y) / radius, -1, 1));
+  const minPhi = opts.minPhi ?? 0.25;
+  const maxPhi = opts.maxPhi ?? 1.3;
+  const minRadius = opts.minRadius ?? radius * 0.55;
+  const maxRadius = opts.maxRadius ?? radius * 1.9;
+  let dragging = false, lastX = 0, lastY = 0;
+
+  function update() {
+    camera.position.x = target.x + radius * Math.sin(phi) * Math.sin(theta);
+    camera.position.z = target.z + radius * Math.sin(phi) * Math.cos(theta);
+    camera.position.y = target.y + radius * Math.cos(phi);
+    camera.lookAt(target);
+  }
+
+  domElement.addEventListener("pointerdown", (e) => {
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    try { domElement.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+  });
+  domElement.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    theta -= dx * 0.008;
+    phi = THREE.MathUtils.clamp(phi - dy * 0.008, minPhi, maxPhi);
+    update();
+  });
+  window.addEventListener("pointerup", () => (dragging = false));
+  domElement.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    radius = THREE.MathUtils.clamp(radius + e.deltaY * 0.012, minRadius, maxRadius);
+    update();
+  }, { passive: false });
+
+  update();
+  return { update, isDragging: () => dragging };
+}
+
+function addTapHandler(domElement, onTap) {
+  let downX = 0, downY = 0, downT = 0, moved = false, isDown = false;
+  domElement.addEventListener("pointerdown", (e) => {
+    downX = e.clientX; downY = e.clientY; downT = performance.now(); moved = false; isDown = true;
+  });
+  domElement.addEventListener("pointermove", (e) => {
+    if (!isDown) return;
+    if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) moved = true;
+  });
+  domElement.addEventListener("pointerup", (e) => {
+    if (isDown && !moved && performance.now() - downT < 600) onTap(e);
+    isDown = false;
+  });
+}
+
+function raycastGround(e, canvas, camera) {
+  const rect = canvas.getBoundingClientRect();
+  const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera({ x: nx, y: ny }, camera);
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const point = new THREE.Vector3();
+  if (!raycaster.ray.intersectPlane(plane, point)) return null;
+  return point;
+}
+
+function createRobotMesh() {
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.58, 0.2, 0.46),
+    new THREE.MeshStandardMaterial({ color: COLORS.robotBody, roughness: 0.35, metalness: 0.1 })
+  );
+  body.position.y = 0.16;
+  group.add(body);
+
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(0.13, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25 })
+  );
+  dome.position.set(-0.05, 0.26, 0);
+  group.add(dome);
+
+  const wheelGeom = new THREE.CylinderGeometry(0.13, 0.13, 0.08, 16);
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1d1d1f });
+  [[0.2, -0.22], [0.2, 0.22], [-0.2, -0.22], [-0.2, 0.22]].forEach(([x, z]) => {
+    const wheel = new THREE.Mesh(wheelGeom, wheelMat);
+    wheel.rotation.x = Math.PI / 2;
+    wheel.position.set(x, 0.13, z);
+    group.add(wheel);
+  });
+
+  const nose = new THREE.Mesh(
+    new THREE.ConeGeometry(0.07, 0.2, 12),
+    new THREE.MeshStandardMaterial({ color: COLORS.goal })
+  );
+  nose.rotation.z = -Math.PI / 2;
+  nose.position.set(0.34, 0.16, 0);
+  group.add(nose);
+
+  return group;
+}
+
+function createMarker(color, shape) {
+  const geom = shape === "cone"
+    ? new THREE.ConeGeometry(0.16, 0.36, 16)
+    : new THREE.OctahedronGeometry(0.16, 0);
+  const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color, roughness: 0.4 }));
+  mesh.position.y = shape === "cone" ? 0.18 : 0.2;
+  return mesh;
+}
+
+/* Grid scene factory shared by A*, Mapping & Navigation labs */
+const CELL_STYLE = {
+  free: { color: COLORS.floor, height: 0.05 },
+  wall: { color: COLORS.wall, height: 0.55 },
+  explored: { color: COLORS.explored, height: 0.05 },
+  path: { color: COLORS.accent, height: 0.15 },
+  fog: { color: 0x9a9aa0, height: 0.16, opacity: 0.85 },
+};
+
+function cellCenter(r, c, cols, rows, cellSize) {
+  const gw = cols * cellSize, gh = rows * cellSize;
+  return { x: c * cellSize - gw / 2 + cellSize / 2, z: r * cellSize - gh / 2 + cellSize / 2 };
+}
+
+function pointToCell(point, cols, rows, cellSize) {
+  const gw = cols * cellSize, gh = rows * cellSize;
+  const c = Math.floor((point.x + gw / 2) / cellSize);
+  const r = Math.floor((point.z + gh / 2) / cellSize);
+  if (c < 0 || c >= cols || r < 0 || r >= rows) return null;
+  return { r, c };
+}
+
+function createGridScene(canvas, cols, rows, cellSize) {
+  const width = canvas.width, height = canvas.height;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(COLORS.bg);
+
+  const gw = cols * cellSize, gh = rows * cellSize;
+  const camDist = Math.max(gw, gh) * 1.05;
+  const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+  const target = new THREE.Vector3(0, 0, 0);
+  camera.position.set(0, camDist * 0.82, camDist * 0.68);
+  camera.lookAt(target);
+
+  const renderer = createRenderer(canvas);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xd8d8dc, 0.95));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.55);
+  dirLight.position.set(gw * 0.3, 10, gh * 0.4);
+  scene.add(dirLight);
+
+  const plate = new THREE.Mesh(
+    new THREE.BoxGeometry(gw + 0.3, 0.03, gh + 0.3),
+    new THREE.MeshStandardMaterial({ color: 0xe4e4e9, roughness: 1 })
+  );
+  plate.position.y = -0.03;
+  scene.add(plate);
+
+  const floorGroup = new THREE.Group();
+  scene.add(floorGroup);
+  const tileGeom = new THREE.BoxGeometry(cellSize * 0.92, 0.05, cellSize * 0.92);
+  const cellMeshes = [];
+  for (let r = 0; r < rows; r++) {
+    cellMeshes[r] = [];
+    for (let c = 0; c < cols; c++) {
+      const mesh = new THREE.Mesh(tileGeom, new THREE.MeshStandardMaterial({ color: COLORS.floor, roughness: 0.9 }));
+      const { x, z } = cellCenter(r, c, cols, rows, cellSize);
+      mesh.position.set(x, 0, z);
+      floorGroup.add(mesh);
+      cellMeshes[r][c] = mesh;
+    }
+  }
+
+  const orbit = attachOrbitControls(camera, target, canvas, {
+    radius: camDist * 1.15,
+    minRadius: camDist * 0.55,
+    maxRadius: camDist * 2,
+    minPhi: 0.25, maxPhi: 1.25,
+  });
+
+  function setCellState(r, c, state) {
+    const mesh = cellMeshes[r][c];
+    const style = CELL_STYLE[state];
+    mesh.geometry.dispose();
+    mesh.geometry = new THREE.BoxGeometry(cellSize * 0.92, style.height, cellSize * 0.92);
+    mesh.position.y = style.height / 2 - 0.025;
+    mesh.material.color.set(style.color);
+    mesh.material.transparent = !!style.opacity;
+    mesh.material.opacity = style.opacity ?? 1;
+  }
+
+  function render() { renderer.render(scene, camera); }
+
+  return { scene, camera, renderer, cellMeshes, gw, gh, orbit, target, setCellState, render, cellSize, cols, rows };
+}
+
+/* Pure A* solver: returns { order, path } of {r,c} cells */
+function runAStarSync(grid, start, goal, cols, rows) {
+  function neighbors(node) {
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const out = [];
+    for (const [dr, dc] of dirs) {
+      const r = node.r + dr, c = node.c + dc;
+      if (r >= 0 && r < rows && c >= 0 && c < cols && !grid[r][c]) out.push({ r, c });
+    }
+    return out;
+  }
+  const heuristic = (a, b) => Math.abs(a.r - b.r) + Math.abs(a.c - b.c);
+  const key = (n) => n.r + "," + n.c;
+
+  const openSet = [{ ...start, g: 0, f: heuristic(start, goal) }];
+  const cameFrom = {};
+  const gScore = { [key(start)]: 0 };
+  const closed = new Set();
+  const order = [];
+
+  while (openSet.length) {
+    openSet.sort((a, b) => a.f - b.f);
+    const current = openSet.shift();
+    const k = key(current);
+    if (closed.has(k)) continue;
+    closed.add(k);
+    order.push(current);
+    if (current.r === goal.r && current.c === goal.c) break;
+
+    for (const n of neighbors(current)) {
+      const nk = key(n);
+      const tentativeG = gScore[k] + 1;
+      if (tentativeG < (gScore[nk] ?? Infinity)) {
+        gScore[nk] = tentativeG;
+        cameFrom[nk] = current;
+        openSet.push({ ...n, g: tentativeG, f: tentativeG + heuristic(n, goal) });
+      }
+    }
+  }
+
+  const goalKey = key(goal);
+  let path = [];
+  if (cameFrom[goalKey] || (start.r === goal.r && start.c === goal.c)) {
+    let cur = goal;
+    while (cur && !(cur.r === start.r && cur.c === start.c)) {
+      path.unshift(cur);
+      cur = cameFrom[key(cur)];
+    }
+  }
+  return { order, path };
+}
+
+/* =========================================================
+   LAB 1 — Differential Drive Kinematics (3D)
    ========================================================= */
 function initDiffDriveLab() {
   const canvas = document.getElementById("dd-canvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const W = canvas.width, H = canvas.height;
-  const PPM = 90; // pixels per meter
-  const WHEEL_BASE = 0.18; // meters
-  const WHEEL_R = 0.032; // meters
-  const MAX_WHEEL_SPEED = 6; // rad/s at slider extremes
+  if (!canvas || typeof THREE === "undefined") return;
+
+  const WORLD_W = 6, WORLD_D = 3.8;
+  const WHEEL_BASE = 0.32, WHEEL_R = 0.06, MAX_WHEEL_SPEED = 6;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(COLORS.bg);
+  const camera = new THREE.PerspectiveCamera(45, canvas.width / canvas.height, 0.1, 100);
+  const target = new THREE.Vector3(0, 0, 0);
+  const renderer = createRenderer(canvas);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xd8d8dc, 1));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  dirLight.position.set(3, 6, 2);
+  scene.add(dirLight);
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(WORLD_W, WORLD_D),
+    new THREE.MeshStandardMaterial({ color: COLORS.floor, roughness: 1 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+  scene.add(new THREE.GridHelper(Math.max(WORLD_W, WORLD_D), 12, 0xd2d2d7, 0xe8e8ed));
+
+  const robot = createRobotMesh();
+  scene.add(robot);
+
+  let trail = [];
+  let trailLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: COLORS.accent, transparent: true, opacity: 0.5 }));
+  scene.add(trailLine);
+
+  camera.position.set(0, 4.6, 5.8);
+  camera.lookAt(target);
+  const orbit = attachOrbitControls(camera, target, canvas, { radius: 7.4, minRadius: 3.6, maxRadius: 11, minPhi: 0.3, maxPhi: 1.3 });
 
   const leftSlider = document.getElementById("dd-left");
   const rightSlider = document.getElementById("dd-right");
@@ -37,14 +352,12 @@ function initDiffDriveLab() {
   const resetBtn = document.getElementById("dd-reset");
   const statusEl = document.getElementById("dd-status");
 
-  let state = { x: (W / 2) / PPM, y: (H / 2) / PPM, theta: 0 };
-  let trail = [];
+  let state = { x: 0, y: 0, theta: 0 };
   let running = false;
   let lastT = null;
 
   function setSliders(l, r) {
-    leftSlider.value = l;
-    rightSlider.value = r;
+    leftSlider.value = l; rightSlider.value = r;
     leftSlider.dispatchEvent(new Event("input"));
     rightSlider.dispatchEvent(new Event("input"));
   }
@@ -65,79 +378,10 @@ function initDiffDriveLab() {
   leftSlider.addEventListener("input", () => (leftVal.textContent = leftSlider.value));
   rightSlider.addEventListener("input", () => (rightVal.textContent = rightSlider.value));
 
-  function drawGrid() {
-    ctx.fillStyle = "#060a14";
-    ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
-    ctx.lineWidth = 1;
-    const step = PPM * 0.5;
-    for (let x = 0; x < W; x += step) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    }
-    for (let y = 0; y < H; y += step) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
-  }
-
-  function drawRobot(px, py, theta) {
-    // trail
-    ctx.strokeStyle = "rgba(94,234,212,0.4)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    trail.forEach((p, i) => {
-      const tx = p.x * PPM, ty = p.y * PPM;
-      i === 0 ? ctx.moveTo(tx, ty) : ctx.lineTo(tx, ty);
-    });
-    ctx.stroke();
-
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(theta);
-    const bodyW = 0.16 * PPM, bodyL = 0.20 * PPM;
-
-    // wheels
-    ctx.fillStyle = "#1b2340";
-    ctx.strokeStyle = "#5eead4";
-    [-1, 1].forEach((side) => {
-      ctx.beginPath();
-      ctx.rect(-bodyL / 2 + 4, side * (bodyW / 2) - 4, bodyL - 8, 8);
-      ctx.fill();
-    });
-
-    // body
-    const grad = ctx.createLinearGradient(-bodyL / 2, 0, bodyL / 2, 0);
-    grad.addColorStop(0, "#5eead4");
-    grad.addColorStop(1, "#a78bfa");
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.roundRect(-bodyL / 2, -bodyW / 2, bodyL, bodyW, 6);
-    ctx.fill();
-
-    // heading arrow
-    ctx.strokeStyle = "#04231f";
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(bodyL / 2 + 10, 0);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(bodyL / 2 + 10, 0);
-    ctx.lineTo(bodyL / 2 + 2, -5);
-    ctx.lineTo(bodyL / 2 + 2, 5);
-    ctx.closePath();
-    ctx.fillStyle = "#04231f";
-    ctx.fill();
-
-    ctx.restore();
-  }
-
   function step(dt) {
-    const lSlider = parseFloat(leftSlider.value) / 100;
-    const rSlider = parseFloat(rightSlider.value) / 100;
-    const wl = lSlider * MAX_WHEEL_SPEED;
-    const wr = rSlider * MAX_WHEEL_SPEED;
-    const vl = wl * WHEEL_R;
-    const vr = wr * WHEEL_R;
+    const wl = (parseFloat(leftSlider.value) / 100) * MAX_WHEEL_SPEED;
+    const wr = (parseFloat(rightSlider.value) / 100) * MAX_WHEEL_SPEED;
+    const vl = wl * WHEEL_R, vr = wr * WHEEL_R;
     const v = (vl + vr) / 2;
     const w = (vr - vl) / WHEEL_BASE;
 
@@ -145,19 +389,25 @@ function initDiffDriveLab() {
     state.y += v * Math.sin(state.theta) * dt;
     state.theta += w * dt;
 
-    const worldW = W / PPM, worldH = H / PPM;
-    if (state.x < 0) state.x += worldW;
-    if (state.x > worldW) state.x -= worldW;
-    if (state.y < 0) state.y += worldH;
-    if (state.y > worldH) state.y -= worldH;
+    if (state.x < -WORLD_W / 2) state.x += WORLD_W;
+    if (state.x > WORLD_W / 2) state.x -= WORLD_W;
+    if (state.y < -WORLD_D / 2) state.y += WORLD_D;
+    if (state.y > WORLD_D / 2) state.y -= WORLD_D;
 
-    trail.push({ x: state.x, y: state.y });
-    if (trail.length > 400) trail.shift();
+    trail.push(new THREE.Vector3(state.x, 0.02, state.y));
+    if (trail.length > 320) trail.shift();
 
     vReadout.textContent = v.toFixed(2) + " m/s";
     wReadout.textContent = w.toFixed(2) + " rad/s";
-    poseReadout.textContent =
-      `(${state.x.toFixed(2)}, ${state.y.toFixed(2)}, ${(state.theta * 180 / Math.PI).toFixed(0)}°)`;
+    poseReadout.textContent = `(${state.x.toFixed(2)}, ${state.y.toFixed(2)}, ${(state.theta * 180 / Math.PI).toFixed(0)}°)`;
+  }
+
+  function render() {
+    robot.position.set(state.x, 0, state.y);
+    robot.rotation.y = -state.theta;
+    trailLine.geometry.dispose();
+    trailLine.geometry = new THREE.BufferGeometry().setFromPoints(trail);
+    renderer.render(scene, camera);
   }
 
   function frame(t) {
@@ -165,8 +415,7 @@ function initDiffDriveLab() {
     const dt = Math.min((t - lastT) / 1000, 0.05);
     lastT = t;
     if (running) step(dt);
-    drawGrid();
-    drawRobot(state.x * PPM, state.y * PPM, state.theta);
+    render();
     requestAnimationFrame(frame);
   }
 
@@ -178,20 +427,19 @@ function initDiffDriveLab() {
 
   startBtn.addEventListener("click", () => toggleRun());
   resetBtn.addEventListener("click", () => {
-    state = { x: (W / 2) / PPM, y: (H / 2) / PPM, theta: 0 };
+    state = { x: 0, y: 0, theta: 0 };
     trail = [];
     setSliders(0, 0);
     document.querySelectorAll("[data-dd-preset]").forEach((b) => b.classList.remove("active"));
     toggleRun(false);
   });
 
-  drawGrid();
-  drawRobot(state.x * PPM, state.y * PPM, state.theta);
+  render();
   requestAnimationFrame(frame);
 }
 
 /* =========================================================
-   LAB 2 — PID Controller Playground
+   LAB 2 — PID Controller Playground (2D chart)
    ========================================================= */
 function initPidLab() {
   const canvas = document.getElementById("pid-canvas");
@@ -229,9 +477,9 @@ function initPidLab() {
     const Ki = parseFloat(kiSlider.value);
     const Kd = parseFloat(kdSlider.value);
     const setpoint = 1.0;
-    const tau = 0.35; // plant time constant
+    const tau = 0.35;
     const dt = 0.02;
-    const steps = 300; // 6 seconds
+    const steps = 300;
 
     let v = 0, integral = 0, prevErr = 0;
     const data = [];
@@ -241,20 +489,18 @@ function initPidLab() {
       integral = Math.max(-3, Math.min(3, integral));
       const deriv = (err - prevErr) / dt;
       let u = Kp * err + Ki * integral + Kd * deriv;
-      u = Math.max(-2.5, Math.min(2.5, u)); // actuator saturation
+      u = Math.max(-2.5, Math.min(2.5, u));
       v += ((u - v) / tau) * dt;
       prevErr = err;
       data.push(v);
     }
-    return { data, setpoint, dt };
+    return { data, setpoint };
   }
 
   function drawFrame(data, setpoint, upTo) {
-    ctx.fillStyle = "#060a14";
+    ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, W, H);
-
-    // grid
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.strokeStyle = "#e8e8ed";
     for (let i = 0; i <= 10; i++) {
       const y = (i / 10) * H;
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
@@ -264,8 +510,7 @@ function initPidLab() {
     const toY = (val) => H - (val / yMax) * H;
     const toX = (i) => (i / data.length) * W;
 
-    // setpoint line
-    ctx.strokeStyle = "rgba(167,139,250,0.8)";
+    ctx.strokeStyle = "#ff9f0a";
     ctx.setLineDash([6, 5]);
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -274,8 +519,7 @@ function initPidLab() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // response curve
-    ctx.strokeStyle = "#5eead4";
+    ctx.strokeStyle = "#0071e3";
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     for (let i = 0; i < upTo; i++) {
@@ -285,10 +529,9 @@ function initPidLab() {
     ctx.stroke();
 
     if (upTo > 0) {
-      const lastX = toX(upTo - 1), lastY = toY(data[upTo - 1]);
-      ctx.fillStyle = "#5eead4";
+      ctx.fillStyle = "#0071e3";
       ctx.beginPath();
-      ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+      ctx.arc(toX(upTo - 1), toY(data[upTo - 1]), 4, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -298,9 +541,8 @@ function initPidLab() {
     if (animId) cancelAnimationFrame(animId);
     const { data, setpoint } = simulate();
     let i = 0;
-    const pointsPerFrame = 4;
     function tick() {
-      i += pointsPerFrame;
+      i += 4;
       drawFrame(data, setpoint, Math.min(i, data.length));
       if (i < data.length) {
         animId = requestAnimationFrame(tick);
@@ -323,24 +565,41 @@ function initPidLab() {
 }
 
 /* =========================================================
-   LAB 3 — Global Planner (A*) Grid Visualizer
+   LAB 3 — Global Planner: A* (3D)
    ========================================================= */
 function initAStarLab() {
   const canvas = document.getElementById("astar-canvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const cols = 26, rows = 14;
-  const cell = canvas.width / cols;
+  if (!canvas || typeof THREE === "undefined") return;
+  const cols = 18, rows = 11, cellSize = 1;
+  const gs = createGridScene(canvas, cols, rows, cellSize);
+
   let grid = Array.from({ length: rows }, () => new Array(cols).fill(0));
   let start = { r: 2, c: 2 };
   let goal = { r: rows - 3, c: cols - 3 };
   let mode = "wall";
-  let exploring = [];
-  let path = [];
-  let timer = null;
+  let timer = null, pathTimer = null;
 
   const statusEl = document.getElementById("astar-status");
   const speedSlider = document.getElementById("astar-speed");
+
+  const startMarker = createMarker(COLORS.start, "cone");
+  const goalMarker = createMarker(COLORS.goal, "octa");
+  gs.scene.add(startMarker, goalMarker);
+
+  function positionMarkers() {
+    const s = cellCenter(start.r, start.c, cols, rows, cellSize);
+    const g = cellCenter(goal.r, goal.c, cols, rows, cellSize);
+    startMarker.position.x = s.x; startMarker.position.z = s.z;
+    goalMarker.position.x = g.x; goalMarker.position.z = g.z;
+  }
+
+  function paintAll() {
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++)
+        gs.setCellState(r, c, grid[r][c] ? "wall" : "free");
+    positionMarkers();
+    gs.render();
+  }
 
   document.querySelectorAll("[data-astar-mode]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -350,146 +609,53 @@ function initAStarLab() {
     });
   });
 
-  function cellFromEvent(e) {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
-    return { c: Math.floor(x / cell), r: Math.floor(y / cell) };
-  }
-
-  function handlePointer(e) {
-    const { r, c } = cellFromEvent(e);
-    if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+  addTapHandler(canvas, (e) => {
+    const point = raycastGround(e, canvas, gs.camera);
+    if (!point) return;
+    const cell = pointToCell(point, cols, rows, cellSize);
+    if (!cell) return;
+    const { r, c } = cell;
     if (mode === "wall") {
       if ((r === start.r && c === start.c) || (r === goal.r && c === goal.c)) return;
       grid[r][c] = grid[r][c] ? 0 : 1;
+      gs.setCellState(r, c, grid[r][c] ? "wall" : "free");
     } else if (mode === "start") {
-      if (!grid[r][c]) start = { r, c };
+      if (!grid[r][c]) { start = { r, c }; positionMarkers(); }
     } else if (mode === "goal") {
-      if (!grid[r][c]) goal = { r, c };
+      if (!grid[r][c]) { goal = { r, c }; positionMarkers(); }
     }
-    exploring = []; path = [];
-    draw();
-  }
+    gs.render();
+  });
 
-  let painting = false;
-  canvas.addEventListener("pointerdown", (e) => { painting = true; handlePointer(e); });
-  canvas.addEventListener("pointermove", (e) => { if (painting && mode === "wall") handlePointer(e); });
-  window.addEventListener("pointerup", () => (painting = false));
-
-  function draw() {
-    ctx.fillStyle = "#060a14";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        let fill = "#0e1526";
-        if (grid[r][c]) fill = "#39415f";
-        ctx.fillStyle = fill;
-        ctx.fillRect(c * cell, r * cell, cell - 1, cell - 1);
-      }
-    }
-    exploring.forEach(({ r, c }) => {
-      ctx.fillStyle = "rgba(167,139,250,0.35)";
-      ctx.fillRect(c * cell, r * cell, cell - 1, cell - 1);
-    });
-    path.forEach(({ r, c }) => {
-      ctx.fillStyle = "rgba(94,234,212,0.85)";
-      ctx.fillRect(c * cell, r * cell, cell - 1, cell - 1);
-    });
-
-    drawMarker(start, "#4ade80", "S");
-    drawMarker(goal, "#fb923c", "G");
-  }
-
-  function drawMarker(pos, color, label) {
-    const x = pos.c * cell + cell / 2, y = pos.r * cell + cell / 2;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, cell * 0.35, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#04231f";
-    ctx.font = `bold ${Math.floor(cell * 0.4)}px sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, x, y + 1);
-  }
-
-  function neighbors(node) {
-    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    const out = [];
-    for (const [dr, dc] of dirs) {
-      const r = node.r + dr, c = node.c + dc;
-      if (r >= 0 && r < rows && c >= 0 && c < cols && !grid[r][c]) out.push({ r, c });
-    }
-    return out;
-  }
-
-  function heuristic(a, b) { return Math.abs(a.r - b.r) + Math.abs(a.c - b.c); }
-  function key(n) { return n.r + "," + n.c; }
-
-  function runAStar() {
+  function runAStarAnimated() {
     if (timer) clearInterval(timer);
-    exploring = []; path = [];
-    const openSet = [{ ...start, g: 0, f: heuristic(start, goal) }];
-    const cameFrom = {};
-    const gScore = { [key(start)]: 0 };
-    const closed = new Set();
-    const order = [];
-
-    while (openSet.length) {
-      openSet.sort((a, b) => a.f - b.f);
-      const current = openSet.shift();
-      const k = key(current);
-      if (closed.has(k)) continue;
-      closed.add(k);
-      order.push(current);
-
-      if (current.r === goal.r && current.c === goal.c) break;
-
-      for (const n of neighbors(current)) {
-        const nk = key(n);
-        const tentativeG = gScore[k] + 1;
-        if (tentativeG < (gScore[nk] ?? Infinity)) {
-          gScore[nk] = tentativeG;
-          cameFrom[nk] = current;
-          openSet.push({ ...n, g: tentativeG, f: tentativeG + heuristic(n, goal) });
-        }
-      }
-    }
-
-    const goalKey = key(goal);
-    let finalPath = [];
-    if (cameFrom[goalKey] || (start.r === goal.r && start.c === goal.c)) {
-      let cur = goal;
-      while (cur && !(cur.r === start.r && cur.c === start.c)) {
-        finalPath.unshift(cur);
-        cur = cameFrom[key(cur)];
-      }
-    }
-
+    if (pathTimer) clearInterval(pathTimer);
+    paintAll();
+    const { order, path } = runAStarSync(grid, start, goal, cols, rows);
     const speed = 301 - parseInt(speedSlider.value, 10);
     let i = 0;
     statusEl.textContent = "Expanding nodes…";
     timer = setInterval(() => {
       if (i < order.length) {
-        exploring.push(order[i]);
+        const n = order[i];
+        if (!(n.r === start.r && n.c === start.c) && !(n.r === goal.r && n.c === goal.c)) {
+          gs.setCellState(n.r, n.c, "explored");
+        }
+        gs.render();
         i++;
-        draw();
       } else {
         clearInterval(timer);
-        if (finalPath.length) {
-          statusEl.textContent = `Path found — ${finalPath.length} steps.`;
+        if (path.length) {
+          statusEl.textContent = `Path found — ${path.length} steps.`;
           let j = 0;
-          const pathTimer = setInterval(() => {
-            if (j < finalPath.length) {
-              path.push(finalPath[j]);
+          pathTimer = setInterval(() => {
+            if (j < path.length) {
+              const n = path[j];
+              if (!(n.r === goal.r && n.c === goal.c)) gs.setCellState(n.r, n.c, "path");
+              gs.render();
               j++;
-              draw();
             } else clearInterval(pathTimer);
-          }, 25);
+          }, 22);
         } else {
           statusEl.textContent = "No path found — goal is walled off.";
         }
@@ -497,39 +663,93 @@ function initAStarLab() {
     }, Math.max(4, speed / 6));
   }
 
-  document.getElementById("astar-run").addEventListener("click", runAStar);
+  document.getElementById("astar-run").addEventListener("click", runAStarAnimated);
   document.getElementById("astar-clear").addEventListener("click", () => {
+    if (timer) clearInterval(timer);
+    if (pathTimer) clearInterval(pathTimer);
     grid = Array.from({ length: rows }, () => new Array(cols).fill(0));
-    exploring = []; path = [];
-    statusEl.textContent = "Grid cleared. Click cells to add walls.";
-    draw();
+    statusEl.textContent = "Grid cleared. Drag to orbit, tap a cell to edit.";
+    paintAll();
   });
 
-  draw();
+  paintAll();
+  gs.render();
+
+  function idleLoop() { gs.render(); requestAnimationFrame(idleLoop); }
+  requestAnimationFrame(idleLoop);
 }
 
 /* =========================================================
-   LAB 4 — Local Planner: Reactive Obstacle Avoidance
+   LAB 4 — Local Planner: Reactive Obstacle Avoidance (3D)
    ========================================================= */
 function initLocalPlannerLab() {
   const canvas = document.getElementById("local-canvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const W = canvas.width, H = canvas.height;
+  if (!canvas || typeof THREE === "undefined") return;
 
-  let robot = { x: 50, y: H / 2, theta: 0 };
-  let goal = { x: W - 50, y: H / 2 };
+  const WORLD_W = 7.4, WORLD_D = 4.4;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(COLORS.bg);
+  const camera = new THREE.PerspectiveCamera(45, canvas.width / canvas.height, 0.1, 100);
+  const target = new THREE.Vector3(0, 0, 0);
+  const renderer = createRenderer(canvas);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xd8d8dc, 1));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  dirLight.position.set(3, 6, 2);
+  scene.add(dirLight);
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(WORLD_W, WORLD_D),
+    new THREE.MeshStandardMaterial({ color: COLORS.floor, roughness: 1 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+  scene.add(new THREE.GridHelper(Math.max(WORLD_W, WORLD_D), 14, 0xd2d2d7, 0xe8e8ed));
+
+  camera.position.set(0, 5.4, 6.8);
+  camera.lookAt(target);
+  const orbit = attachOrbitControls(camera, target, canvas, { radius: 8.6, minRadius: 4, maxRadius: 13, minPhi: 0.3, maxPhi: 1.3 });
+
+  let robot = { x: -WORLD_W / 2 + 0.6, y: 0, theta: 0 };
+  let goal = { x: WORLD_W / 2 - 0.6, y: 0 };
   let obstacles = [
-    { x: W * 0.4, y: H * 0.35, r: 22 },
-    { x: W * 0.55, y: H * 0.65, r: 26 },
-    { x: W * 0.7, y: H * 0.3, r: 18 },
+    { x: -0.6, y: 0.9, r: 0.32 },
+    { x: 0.6, y: -0.9, r: 0.38 },
+    { x: 1.7, y: 0.6, r: 0.26 },
   ];
   let mode = "obstacle";
   let running = false;
   let trail = [];
+
+  const robotMesh = createRobotMesh();
+  scene.add(robotMesh);
+  const goalMesh = createMarker(COLORS.goal, "octa");
+  scene.add(goalMesh);
+  const trailLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: COLORS.accent, transparent: true, opacity: 0.5 }));
+  scene.add(trailLine);
+
+  const obstacleGroup = new THREE.Group();
+  scene.add(obstacleGroup);
+  function rebuildObstacleMeshes() {
+    obstacleGroup.clear();
+    obstacles.forEach((o) => {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(o.r, o.r, 0.42, 20),
+        new THREE.MeshStandardMaterial({ color: COLORS.danger, roughness: 0.5 })
+      );
+      mesh.position.set(o.x, 0.21, o.y);
+      obstacleGroup.add(mesh);
+    });
+  }
+  rebuildObstacleMeshes();
+
+  const RAY_COUNT = 10, RAY_LEN = 1.3;
+  const rayGeom = new THREE.BufferGeometry();
+  rayGeom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(RAY_COUNT * 2 * 3), 3));
+  const rayLines = new THREE.LineSegments(rayGeom, new THREE.LineBasicMaterial({ color: COLORS.ray, transparent: true, opacity: 0.6 }));
+  scene.add(rayLines);
+
   const statusEl = document.getElementById("local-status");
-  const RAY_COUNT = 10;
-  const RAY_LEN = 90;
 
   document.querySelectorAll("[data-local-mode]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -539,22 +759,25 @@ function initLocalPlannerLab() {
     });
   });
 
-  canvas.addEventListener("pointerdown", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX, y = (e.clientY - rect.top) * scaleY;
+  addTapHandler(canvas, (e) => {
+    const point = raycastGround(e, canvas, camera);
+    if (!point) return;
+    const x = THREE.MathUtils.clamp(point.x, -WORLD_W / 2 + 0.2, WORLD_W / 2 - 0.2);
+    const y = THREE.MathUtils.clamp(point.z, -WORLD_D / 2 + 0.2, WORLD_D / 2 - 0.2);
     if (mode === "goal") {
       goal = { x, y };
+      goalMesh.position.set(x, 0.2, y);
     } else {
-      const hitIdx = obstacles.findIndex((o) => Math.hypot(o.x - x, o.y - y) < o.r);
+      const hitIdx = obstacles.findIndex((o) => Math.hypot(o.x - x, o.y - y) < o.r + 0.1);
       if (hitIdx >= 0) obstacles.splice(hitIdx, 1);
-      else if (obstacles.length < 8) obstacles.push({ x, y, r: 18 + Math.random() * 12 });
+      else if (obstacles.length < 8) obstacles.push({ x, y, r: 0.26 + Math.random() * 0.16 });
+      rebuildObstacleMeshes();
     }
-    draw();
+    render();
   });
 
   function castRays() {
-    const hits = [];
+    const positions = rayGeom.attributes.position.array;
     for (let i = 0; i < RAY_COUNT; i++) {
       const angle = robot.theta - Math.PI / 2 + (i / (RAY_COUNT - 1)) * Math.PI;
       let dist = RAY_LEN;
@@ -566,9 +789,13 @@ function initLocalPlannerLab() {
           if (perp < o.r) dist = Math.min(dist, Math.max(0, proj - o.r));
         }
       }
-      hits.push({ angle, dist });
+      const idx = i * 6;
+      positions[idx] = robot.x; positions[idx + 1] = 0.1; positions[idx + 2] = robot.y;
+      positions[idx + 3] = robot.x + Math.cos(angle) * dist;
+      positions[idx + 4] = 0.1;
+      positions[idx + 5] = robot.y + Math.sin(angle) * dist;
     }
-    return hits;
+    rayGeom.attributes.position.needsUpdate = true;
   }
 
   function step() {
@@ -578,8 +805,8 @@ function initLocalPlannerLab() {
     obstacles.forEach((o) => {
       const dx = robot.x - o.x, dy = robot.y - o.y;
       const dist = Math.hypot(dx, dy);
-      const influence = o.r + 55;
-      if (dist < influence) {
+      const influence = o.r + 0.75;
+      if (dist < influence && dist > 0.001) {
         const strength = (influence - dist) / influence;
         fx += (dx / dist) * strength * 2.2;
         fy += (dy / dist) * strength * 2.2;
@@ -592,76 +819,30 @@ function initLocalPlannerLab() {
     while (diff < -Math.PI) diff += 2 * Math.PI;
     robot.theta += diff * 0.12;
 
-    robot.x += Math.cos(robot.theta) * 1.8;
-    robot.y += Math.sin(robot.theta) * 1.8;
-    trail.push({ x: robot.x, y: robot.y });
-    if (trail.length > 250) trail.shift();
+    robot.x += Math.cos(robot.theta) * 0.028;
+    robot.y += Math.sin(robot.theta) * 0.028;
+    trail.push(new THREE.Vector3(robot.x, 0.02, robot.y));
+    if (trail.length > 260) trail.shift();
 
-    if (Math.hypot(goal.x - robot.x, goal.y - robot.y) < 14) {
+    if (Math.hypot(goal.x - robot.x, goal.y - robot.y) < 0.18) {
       running = false;
       statusEl.textContent = "🎯 Goal reached!";
     }
   }
 
-  function draw() {
-    ctx.fillStyle = "#060a14";
-    ctx.fillRect(0, 0, W, H);
-
-    ctx.strokeStyle = "rgba(94,234,212,0.35)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    trail.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-    ctx.stroke();
-
-    obstacles.forEach((o) => {
-      ctx.fillStyle = "rgba(248,113,113,0.75)";
-      ctx.beginPath();
-      ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    ctx.fillStyle = "#fb923c";
-    ctx.beginPath();
-    ctx.moveTo(goal.x, goal.y - 12);
-    ctx.lineTo(goal.x + 10, goal.y);
-    ctx.lineTo(goal.x, goal.y + 12);
-    ctx.lineTo(goal.x - 10, goal.y);
-    ctx.closePath();
-    ctx.fill();
-
-    if (running) {
-      const rays = castRays();
-      ctx.strokeStyle = "rgba(167,139,250,0.35)";
-      ctx.lineWidth = 1;
-      rays.forEach((ray) => {
-        ctx.beginPath();
-        ctx.moveTo(robot.x, robot.y);
-        ctx.lineTo(robot.x + Math.cos(ray.angle) * ray.dist, robot.y + Math.sin(ray.angle) * ray.dist);
-        ctx.stroke();
-      });
-    }
-
-    ctx.save();
-    ctx.translate(robot.x, robot.y);
-    ctx.rotate(robot.theta);
-    ctx.fillStyle = "#5eead4";
-    ctx.beginPath();
-    ctx.arc(0, 0, 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#04231f";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(14, 0);
-    ctx.stroke();
-    ctx.restore();
+  function render() {
+    robotMesh.position.set(robot.x, 0, robot.y);
+    robotMesh.rotation.y = -robot.theta;
+    trailLine.geometry.dispose();
+    trailLine.geometry = new THREE.BufferGeometry().setFromPoints(trail);
+    if (running) castRays();
+    rayLines.visible = running;
+    renderer.render(scene, camera);
   }
 
   function loop() {
-    if (running) {
-      step();
-      draw();
-    }
+    if (running) step();
+    render();
     requestAnimationFrame(loop);
   }
 
@@ -670,19 +851,406 @@ function initLocalPlannerLab() {
     statusEl.textContent = "Navigating around obstacles…";
   });
   document.getElementById("local-reset").addEventListener("click", () => {
-    robot = { x: 50, y: H / 2, theta: 0 };
+    robot = { x: -WORLD_W / 2 + 0.6, y: 0, theta: 0 };
     trail = [];
     running = false;
-    statusEl.textContent = "Click the canvas to add/remove obstacles, then Run.";
-    draw();
+    statusEl.textContent = "Tap the floor to add/remove obstacles, then Run.";
+    render();
   });
 
-  draw();
+  render();
   requestAnimationFrame(loop);
 }
 
 /* =========================================================
-   LAB 5 — Object Detection: IoU Playground
+   LAB 5 — Mapping: SLAM-style Occupancy Grid (3D, NEW)
+   ========================================================= */
+function initMappingLab() {
+  const canvas = document.getElementById("mapping-canvas");
+  if (!canvas || typeof THREE === "undefined") return;
+  const cols = 16, rows = 10, cellSize = 1;
+  const gs = createGridScene(canvas, cols, rows, cellSize);
+
+  const robotStart = { r: rows - 2, c: 1 };
+  let groundTruth, revealed, robotCell, robotPos, exploring, moveAnim;
+  const statusEl = document.getElementById("mapping-status");
+  const progressEl = document.getElementById("mapping-progress");
+  const runBtn = document.getElementById("mapping-run");
+
+  const robotMesh = createRobotMesh();
+  gs.scene.add(robotMesh);
+  let exploreTimer = null;
+
+  function generateMaze() {
+    const gt = Array.from({ length: rows }, () => new Array(cols).fill(0));
+    const wallCount = Math.floor(cols * rows * 0.22);
+    for (let i = 0; i < wallCount; i++) {
+      const r = 1 + Math.floor(Math.random() * (rows - 2));
+      const c = 1 + Math.floor(Math.random() * (cols - 2));
+      gt[r][c] = 1;
+    }
+    gt[robotStart.r][robotStart.c] = 0;
+    return gt;
+  }
+
+  function hasLineOfSight(r0, c0, r1, c1) {
+    const steps = Math.max(Math.abs(r1 - r0), Math.abs(c1 - c0)) * 3 || 1;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const rr = Math.round(r0 + (r1 - r0) * t);
+      const cc = Math.round(c0 + (c1 - c0) * t);
+      if (groundTruth[rr][cc] === 1 && !(rr === r1 && cc === c1)) return false;
+    }
+    return true;
+  }
+
+  function reveal(r0, c0, R) {
+    const rMin = Math.max(0, Math.floor(r0 - R)), rMax = Math.min(rows - 1, Math.ceil(r0 + R));
+    const cMin = Math.max(0, Math.floor(c0 - R)), cMax = Math.min(cols - 1, Math.ceil(c0 + R));
+    for (let r = rMin; r <= rMax; r++) {
+      for (let c = cMin; c <= cMax; c++) {
+        if (revealed[r][c]) continue;
+        if (Math.hypot(r - r0, c - c0) > R) continue;
+        if (hasLineOfSight(r0, c0, r, c)) {
+          revealed[r][c] = true;
+          gs.setCellState(r, c, groundTruth[r][c] ? "wall" : "free");
+        }
+      }
+    }
+  }
+
+  function explored() {
+    let n = 0;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (revealed[r][c]) n++;
+    return n / (cols * rows);
+  }
+
+  function reset() {
+    if (exploreTimer) clearInterval(exploreTimer);
+    exploring = false;
+    runBtn.textContent = "▶ Start exploring";
+    groundTruth = generateMaze();
+    revealed = Array.from({ length: rows }, () => new Array(cols).fill(false));
+    robotCell = { r: robotStart.r, c: robotStart.c };
+    const p = cellCenter(robotCell.r, robotCell.c, cols, rows, cellSize);
+    robotPos = { x: p.x, z: p.z, theta: 0 };
+    moveAnim = null;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) gs.setCellState(r, c, "fog");
+    reveal(robotCell.r, robotCell.c, 2.4);
+    robotMesh.position.set(robotPos.x, 0, robotPos.z);
+    statusEl.textContent = "Tap fogged cells to sketch hidden walls, then start exploring.";
+    progressEl.textContent = Math.round(explored() * 100) + "%";
+    gs.render();
+  }
+
+  addTapHandler(canvas, (e) => {
+    if (exploring) return;
+    const point = raycastGround(e, canvas, gs.camera);
+    if (!point) return;
+    const cell = pointToCell(point, cols, rows, cellSize);
+    if (!cell) return;
+    const { r, c } = cell;
+    if (r === robotCell.r && c === robotCell.c) return;
+    groundTruth[r][c] = groundTruth[r][c] ? 0 : 1;
+    if (revealed[r][c]) gs.setCellState(r, c, groundTruth[r][c] ? "wall" : "free");
+    gs.render();
+  });
+
+  function pickNextCell() {
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const options = [];
+    dirs.forEach(([dr, dc]) => {
+      const r = robotCell.r + dr, c = robotCell.c + dc;
+      if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+      if (groundTruth[r][c]) return;
+      const weight = revealed[r][c] ? 1 : 6;
+      for (let i = 0; i < weight; i++) options.push({ r, c });
+    });
+    if (!options.length) return null;
+    return options[Math.floor(Math.random() * options.length)];
+  }
+
+  function exploreTick() {
+    if (moveAnim) return; // still animating previous move
+    if (explored() > 0.94) {
+      statusEl.textContent = "🗺️ Map complete!";
+      stopExploring();
+      return;
+    }
+    const next = pickNextCell();
+    if (!next) { statusEl.textContent = "Stuck — no free neighbor to explore."; return; }
+    const from = cellCenter(robotCell.r, robotCell.c, cols, rows, cellSize);
+    const to = cellCenter(next.r, next.c, cols, rows, cellSize);
+    const theta = Math.atan2(to.z - from.z, to.x - from.x);
+    moveAnim = { from, to, theta, t: 0 };
+    robotCell = next;
+  }
+
+  function stopExploring() {
+    exploring = false;
+    runBtn.textContent = "▶ Start exploring";
+    if (exploreTimer) clearInterval(exploreTimer);
+  }
+
+  runBtn.addEventListener("click", () => {
+    exploring = !exploring;
+    if (exploring) {
+      runBtn.textContent = "⏸ Stop";
+      statusEl.textContent = "Exploring — casting simulated LiDAR as it moves…";
+      exploreTimer = setInterval(exploreTick, 260);
+    } else {
+      stopExploring();
+      statusEl.textContent = "Paused. Edit walls or resume exploring.";
+    }
+  });
+
+  document.getElementById("mapping-reset").addEventListener("click", reset);
+
+  function animFrame() {
+    if (moveAnim) {
+      moveAnim.t += 0.06;
+      const t = Math.min(1, moveAnim.t);
+      robotPos.x = moveAnim.from.x + (moveAnim.to.x - moveAnim.from.x) * t;
+      robotPos.z = moveAnim.from.z + (moveAnim.to.z - moveAnim.from.z) * t;
+      robotPos.theta = moveAnim.theta;
+      if (t >= 1) {
+        reveal(robotCell.r, robotCell.c, 2.4);
+        progressEl.textContent = Math.round(explored() * 100) + "%";
+        moveAnim = null;
+      }
+    }
+    robotMesh.position.set(robotPos.x, 0, robotPos.z);
+    robotMesh.rotation.y = -robotPos.theta;
+    gs.render();
+    requestAnimationFrame(animFrame);
+  }
+
+  reset();
+  requestAnimationFrame(animFrame);
+}
+
+/* =========================================================
+   LAB 6 — Navigation: Global + Local Planner Combined (3D, NEW)
+   ========================================================= */
+function initNavigationLab() {
+  const canvas = document.getElementById("nav-canvas");
+  if (!canvas || typeof THREE === "undefined") return;
+  const cols = 16, rows = 10, cellSize = 1;
+  const gs = createGridScene(canvas, cols, rows, cellSize);
+
+  let grid = Array.from({ length: rows }, () => new Array(cols).fill(0));
+  const wallCount = Math.floor(cols * rows * 0.14);
+  for (let i = 0; i < wallCount; i++) {
+    const r = 1 + Math.floor(Math.random() * (rows - 2));
+    const c = 2 + Math.floor(Math.random() * (cols - 4));
+    grid[r][c] = 1;
+  }
+  const start = { r: rows - 2, c: 1 };
+  let goal = { r: 1, c: cols - 2 };
+  grid[start.r][start.c] = 0;
+  grid[goal.r][goal.c] = 0;
+
+  let mode = "goal";
+  let path = [];
+  let pathCells = [];
+  let following = false;
+  let pathIdx = 0;
+  let blockedSince = null;
+  let lastReplanAttempt = 0;
+  const statusEl = document.getElementById("nav-status");
+
+  const startMarker = createMarker(COLORS.start, "cone");
+  const goalMarker = createMarker(COLORS.goal, "octa");
+  gs.scene.add(startMarker, goalMarker);
+  const robotMesh = createRobotMesh();
+  gs.scene.add(robotMesh);
+
+  const obstacleMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.28, 20, 20),
+    new THREE.MeshStandardMaterial({ color: COLORS.danger, roughness: 0.4 })
+  );
+  gs.scene.add(obstacleMesh);
+  let obPos = cellCenter(Math.floor(rows / 2), Math.floor(cols / 2), cols, rows, cellSize);
+  let obVel = { x: 0.012, z: 0.009 };
+
+  let robotPos = cellCenter(start.r, start.c, cols, rows, cellSize);
+  let robotTheta = 0;
+
+  function paintBase() {
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) gs.setCellState(r, c, grid[r][c] ? "wall" : "free");
+  }
+  function paintPath() {
+    pathCells.forEach((n) => {
+      if (!grid[n.r][n.c]) gs.setCellState(n.r, n.c, "path");
+    });
+  }
+  function positionMarkers() {
+    const s = cellCenter(start.r, start.c, cols, rows, cellSize);
+    const g = cellCenter(goal.r, goal.c, cols, rows, cellSize);
+    startMarker.position.set(s.x, startMarker.position.y, s.z);
+    goalMarker.position.set(g.x, goalMarker.position.y, g.z);
+  }
+
+  document.querySelectorAll("[data-nav-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-nav-mode]").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      mode = btn.dataset.navMode;
+    });
+  });
+
+  addTapHandler(canvas, (e) => {
+    if (following) return;
+    const point = raycastGround(e, canvas, gs.camera);
+    if (!point) return;
+    const cell = pointToCell(point, cols, rows, cellSize);
+    if (!cell) return;
+    const { r, c } = cell;
+    if ((r === start.r && c === start.c)) return;
+    if (mode === "wall") {
+      grid[r][c] = grid[r][c] ? 0 : 1;
+      paintBase(); paintPath(); positionMarkers();
+    } else if (mode === "goal") {
+      if (!grid[r][c]) { goal = { r, c }; positionMarkers(); }
+    }
+    gs.render();
+  });
+
+  function currentRobotCell() {
+    return pointToCell(new THREE.Vector3(robotPos.x, 0, robotPos.z), cols, rows, cellSize) || { ...start };
+  }
+
+  function beginNavigate() {
+    paintBase();
+    const from = currentRobotCell();
+    const result = runAStarSync(grid, from, goal, cols, rows);
+    if (!result.path.length) {
+      statusEl.textContent = "🚫 No path found — remove a few walls and try again.";
+      return;
+    }
+    pathCells = result.path;
+    path = pathCells.map((n) => cellCenter(n.r, n.c, cols, rows, cellSize));
+    pathIdx = 0;
+    following = true;
+    blockedSince = null;
+    paintPath();
+    positionMarkers();
+    statusEl.textContent = "🧭 Global path planned — following with live obstacle avoidance…";
+  }
+
+  function replan() {
+    const obCell = pointToCell(new THREE.Vector3(obPos.x, 0, obPos.z), cols, rows, cellSize);
+    const tempGrid = grid.map((row) => row.slice());
+    if (obCell) tempGrid[obCell.r][obCell.c] = 1;
+    const from = currentRobotCell();
+    const result = runAStarSync(tempGrid, from, goal, cols, rows);
+    paintBase();
+    if (result.path.length) {
+      pathCells = result.path;
+      path = pathCells.map((n) => cellCenter(n.r, n.c, cols, rows, cellSize));
+      pathIdx = 0;
+      paintPath();
+      statusEl.textContent = "🔄 Re-routed around the dynamic obstacle.";
+    } else {
+      statusEl.textContent = "⏳ Blocked — waiting for a path to clear…";
+    }
+    positionMarkers();
+    blockedSince = null;
+  }
+
+  document.getElementById("nav-run").addEventListener("click", beginNavigate);
+  document.getElementById("nav-reset").addEventListener("click", () => {
+    following = false;
+    grid = Array.from({ length: rows }, () => new Array(cols).fill(0));
+    for (let i = 0; i < wallCount; i++) {
+      const r = 1 + Math.floor(Math.random() * (rows - 2));
+      const c = 2 + Math.floor(Math.random() * (cols - 4));
+      grid[r][c] = 1;
+    }
+    grid[start.r][start.c] = 0;
+    grid[goal.r][goal.c] = 0;
+    robotPos = cellCenter(start.r, start.c, cols, rows, cellSize);
+    robotTheta = 0;
+    pathCells = []; path = []; pathIdx = 0;
+    obPos = cellCenter(Math.floor(rows / 2), Math.floor(cols / 2), cols, rows, cellSize);
+    statusEl.textContent = "Draw walls or drag-orbit to inspect, set a goal, then Navigate.";
+    paintBase(); positionMarkers();
+    gs.render();
+  });
+
+  const DANGER_RADIUS = 0.85;
+
+  function moveObstacle() {
+    let nx = obPos.x + obVel.x, nz = obPos.z + obVel.z;
+    const cell = pointToCell(new THREE.Vector3(nx, 0, nz), cols, rows, cellSize);
+    if (!cell || grid[cell.r][cell.c]) {
+      obVel.x *= -1; obVel.z *= -1;
+      nx = obPos.x + obVel.x; nz = obPos.z + obVel.z;
+    }
+    if (nx < -gs.gw / 2 + 0.3 || nx > gs.gw / 2 - 0.3) obVel.x *= -1;
+    if (nz < -gs.gh / 2 + 0.3 || nz > gs.gh / 2 - 0.3) obVel.z *= -1;
+    obPos.x += obVel.x; obPos.z += obVel.z;
+    obstacleMesh.position.set(obPos.x, 0.28, obPos.z);
+  }
+
+  function followPath() {
+    if (!following || !path.length) return;
+    const targetPos = path[pathIdx];
+    const dx = targetPos.x - robotPos.x, dz = targetPos.z - robotPos.z;
+    const dist = Math.hypot(dx, dz);
+
+    const obDist = Math.hypot(obPos.x - robotPos.x, obPos.z - robotPos.z);
+    const blocked = obDist < DANGER_RADIUS;
+
+    if (blocked) {
+      if (blockedSince === null) blockedSince = performance.now();
+      statusEl.textContent = "⚠️ Dynamic obstacle ahead — local planner yielding…";
+      if (performance.now() - blockedSince > 1200 && performance.now() - lastReplanAttempt > 1200) {
+        lastReplanAttempt = performance.now();
+        replan();
+      }
+      return;
+    }
+    blockedSince = null;
+
+    if (dist < 0.08) {
+      pathIdx++;
+      if (pathIdx >= path.length) {
+        following = false;
+        statusEl.textContent = "🎯 Destination reached!";
+        return;
+      }
+      return;
+    }
+    const heading = Math.atan2(dz, dx);
+    let diff = heading - robotTheta;
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    robotTheta += diff * 0.15;
+    const speed = 0.03;
+    robotPos.x += (dx / dist) * speed;
+    robotPos.z += (dz / dist) * speed;
+  }
+
+  function frame() {
+    moveObstacle();
+    followPath();
+    robotMesh.position.set(robotPos.x, 0, robotPos.z);
+    robotMesh.rotation.y = -robotTheta;
+    gs.render();
+    requestAnimationFrame(frame);
+  }
+
+  paintBase();
+  positionMarkers();
+  robotMesh.position.set(robotPos.x, 0, robotPos.z);
+  statusEl.textContent = "Draw walls or drag-orbit to inspect, set a goal, then Navigate.";
+  gs.render();
+  requestAnimationFrame(frame);
+}
+
+/* =========================================================
+   LAB 7 — Object Detection: IoU Playground (2D)
    ========================================================= */
 function initIouLab() {
   const canvas = document.getElementById("iou-canvas");
@@ -700,7 +1268,7 @@ function initIouLab() {
   const verdictEl = document.getElementById("iou-verdict");
   const HANDLE = 12;
 
-  let dragMode = null; // "move" | "resize"
+  let dragMode = null;
   let dragStart = null;
 
   function iou(a, b) {
@@ -713,48 +1281,44 @@ function initIouLab() {
   }
 
   function draw() {
-    ctx.fillStyle = "#060a14";
+    ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.strokeStyle = "#eaeaef";
     for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
     for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
-    // ground truth
-    ctx.strokeStyle = "#4ade80";
+    ctx.strokeStyle = "#34c759";
     ctx.setLineDash([7, 5]);
     ctx.lineWidth = 2.5;
     ctx.strokeRect(gt.x, gt.y, gt.w, gt.h);
     ctx.setLineDash([]);
-    ctx.fillStyle = "#4ade80";
+    ctx.fillStyle = "#248a3d";
     ctx.font = "bold 12px sans-serif";
     ctx.fillText("Ground Truth", gt.x, gt.y - 8);
 
-    // intersection
     const x1 = Math.max(gt.x, pred.x), y1 = Math.max(gt.y, pred.y);
     const x2 = Math.min(gt.x + gt.w, pred.x + pred.w), y2 = Math.min(gt.y + gt.h, pred.y + pred.h);
     if (x2 > x1 && y2 > y1) {
-      ctx.fillStyle = "rgba(94,234,212,0.22)";
+      ctx.fillStyle = "rgba(0,113,227,0.14)";
       ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
     }
 
-    // prediction
     const score = iou(gt, pred);
     const threshold = parseFloat(thresholdSlider.value);
     const match = score >= threshold;
-    ctx.strokeStyle = match ? "#5eead4" : "#f87171";
+    ctx.strokeStyle = match ? "#0071e3" : "#ff3b30";
     ctx.lineWidth = 2.5;
     ctx.strokeRect(pred.x, pred.y, pred.w, pred.h);
-    ctx.fillStyle = match ? "#5eead4" : "#f87171";
+    ctx.fillStyle = match ? "#0071e3" : "#ff3b30";
     ctx.font = "bold 12px sans-serif";
     ctx.fillText("Prediction", pred.x, pred.y + pred.h + 16);
 
-    // resize handle
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = "#1d1d1f";
     ctx.fillRect(pred.x + pred.w - HANDLE / 2, pred.y + pred.h - HANDLE / 2, HANDLE, HANDLE);
 
     iouVal.textContent = score.toFixed(2);
     verdictEl.textContent = match ? "✅ True Positive — boxes match" : "❌ False Positive — below threshold";
-    verdictEl.style.color = match ? "#4ade80" : "#f87171";
+    verdictEl.style.color = match ? "#248a3d" : "#ff3b30";
   }
 
   function pointerPos(e) {
@@ -802,7 +1366,7 @@ function initIouLab() {
 }
 
 /* =========================================================
-   LAB 6 — ROS2 Data Flow / Nav Stack Pipeline
+   LAB 8 — ROS2 Data Flow / Nav Stack Pipeline (DOM)
    ========================================================= */
 function initRosPipelineLab() {
   const pipeline = document.getElementById("ros-pipeline");
@@ -911,6 +1475,26 @@ function initQuiz() {
         "Calculate battery voltage drop",
       ],
       correct: 0,
+    },
+    {
+      q: "What does an occupancy grid map store for each cell?",
+      options: [
+        "The exact RGB pixel color at that location",
+        "Whether the cell is free, occupied, or still unknown",
+        "The robot's battery percentage",
+        "A Wi-Fi signal strength reading",
+      ],
+      correct: 1,
+    },
+    {
+      q: "In the Navigation lab, what triggers the robot to replan its global path?",
+      options: [
+        "The user pressing pause",
+        "The robot reaching the goal",
+        "A dynamic obstacle blocking the planned path for too long",
+        "The battery running low",
+      ],
+      correct: 2,
     },
   ];
 
