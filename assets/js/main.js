@@ -47,22 +47,4 @@ document.addEventListener("DOMContentLoaded", () => {
       item.classList.toggle("open");
     });
   });
-
-  // BOM tier filter (DIY page)
-  const chips = document.querySelectorAll(".chip[data-tier]");
-  const rows = document.querySelectorAll("[data-row-tier]");
-  if (chips.length && rows.length) {
-    chips.forEach((chip) => {
-      chip.addEventListener("click", () => {
-        chips.forEach((c) => c.classList.remove("active"));
-        chip.classList.add("active");
-        const tier = chip.dataset.tier;
-        rows.forEach((row) => {
-          const rowTier = row.dataset.rowTier;
-          row.style.display =
-            tier === "all" || rowTier === tier || rowTier === "core" ? "" : "none";
-        });
-      });
-    });
-  }
 });

@@ -2,15 +2,15 @@
 
 A static, multi-page website for a hands-on Robotics & AI course covering
 ROS2, differential-drive kinematics, object detection, and the full Nav2
-navigation stack (global planner, local planner, controllers) — paired with
-a DIY guide for building a real autonomous robot for under ₹50,000.
+navigation stack (global planner, local planner, controllers) — culminating
+in a capstone module on building a real autonomous robot for under ₹50,000.
 
 No build step or dependencies beyond a single CDN script (Three.js, for the
 3D labs) — everything else is plain HTML, CSS, and vanilla JavaScript.
 
 ## Pages
 
-- `index.html` — landing page, course overview, capstone/budget snapshot
+- `index.html` — landing page, course overview, capstone project teaser
 - `curriculum.html` — 12-module curriculum as an expandable accordion
 - `labs.html` — eight interactive simulators plus an 8-question quiz. Most
   are rendered in real, orbit-able 3D with Three.js:
@@ -24,8 +24,6 @@ No build step or dependencies beyond a single CDN script (Three.js, for the
   7. Object detection IoU (Intersection over Union) playground (2D — image
      bounding boxes are inherently 2D)
   8. ROS2 sensor → planner → controller data-flow visualizer (DOM)
-- `diy-robot.html` — bill of materials, budget breakdown, assembly steps,
-  and ROS2/Nav2 software setup for the capstone robot build
 - `resources.html` — tooling links, a ROS2 CLI cheat sheet, and FAQ
 
 ## Design
@@ -39,12 +37,11 @@ follows automatically via `prefers-color-scheme`.
 ```
 assets/
   css/style.css   shared design system (light/dark tokens, cards, tables, labs UI)
-  js/main.js      nav toggle, curriculum accordion, FAQ, BOM tier filter
+  js/main.js      nav toggle, curriculum accordion, FAQ
   js/labs.js      all eight interactive lab simulators + quiz logic
 index.html
 curriculum.html
 labs.html
-diy-robot.html
 resources.html
 ```
 
