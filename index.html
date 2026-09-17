@@ -35,7 +35,7 @@
         <p class="lede">
           A project-based course covering ROS2 fundamentals, differential-drive kinematics,
           object detection, and the full Nav2 navigation stack — global planner, local planner,
-          and controllers — paired with a DIY build guide for a robot that costs
+          and controllers — culminating in a hands-on capstone build for a robot that costs
           <strong>under ₹50,000</strong>.
         </p>
         <div class="hero-actions">
@@ -49,19 +49,12 @@
           <div class="stat"><b>1</b><span>Capstone Robot</span></div>
         </div>
       </div>
-      <div class="hero-visual">
-        <div class="terminal-dots"><span></span><span></span><span></span></div>
-        <pre><span class="dim"># launch the navigation stack</span>
-<span class="k">$</span> ros2 launch nav2_bringup navigation_launch.py
-
-<span class="dim">[INFO] [amcl]:</span> localization initialized
-<span class="dim">[INFO] [planner_server]:</span> global plan: <span class="s">42 waypoints</span>
-<span class="dim">[INFO] [controller_server]:</span> local planner: <span class="s">DWB</span>
-<span class="dim">[INFO] [bt_navigator]:</span> navigating to goal…
-
-<span class="k">$</span> ros2 topic echo /cmd_vel --once
-linear:  {x: 0.22, y: 0.0, z: 0.0}
-angular: {x: 0.0, y: 0.0, z: 0.08}</pre>
+      <div class="hero-video">
+        <video controls playsinline preload="metadata" poster="assets/img/robot-build.jpg">
+          <source src="assets/video/robot-demo.mp4" type="video/mp4" />
+          Your browser doesn't support embedded video. <a href="assets/video/robot-demo.mp4">Download the video</a> instead.
+        </video>
+        <span class="hero-video-caption">🎥 The actual robot, in action</span>
       </div>
     </div>
   </header>
