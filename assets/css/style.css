@@ -566,6 +566,27 @@ footer {
   .cta-band { padding: 34px 22px; }
 }
 
+.robot-showcase {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 44px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 32px;
+  box-shadow: var(--shadow-sm);
+}
+.robot-showcase img {
+  width: 100%;
+  border-radius: 16px;
+  display: block;
+}
+.robot-showcase h2 { margin-top: 14px; font-size: 1.6rem; }
+@media (max-width: 760px) {
+  .robot-showcase { grid-template-columns: 1fr; padding: 22px; gap: 22px; }
+}
+
 /* =========================================================
    Interactive Labs widgets
    ========================================================= */
